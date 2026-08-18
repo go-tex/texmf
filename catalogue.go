@@ -55,3 +55,28 @@ var Beamer = Bundle{
 		},
 	},
 }
+
+// All is the catalogue, keyed by bundle name. The publish workflow reads a pin
+// from here rather than repeating it in YAML, so a mirror can never carry a
+// version or digest this code does not name.
+var All = map[string]Bundle{
+	Beamer.Name: Beamer,
+}
+
+// Lookup returns a catalogue bundle by name.
+func Lookup(name string) (Bundle, bool) {
+	b, ok := All[name]
+	return b, ok
+}
+
+// UpstreamURL returns the bundle's upstream route, which is by convention its
+// last one: the registry mirrors exist to be tried first, and the publisher
+// needs the source they mirror.
+func UpstreamURL(b Bundle) (string, bool) {
+	for i := len(b.Sources) - 1; i >= 0; i-- {
+		if h, ok := b.Sources[i].(HTTPSource); ok {
+			return h.URL, true
+		}
+	}
+	return "", false
+}

@@ -1,0 +1,75 @@
+name: publish
+
+# Mirrors a catalogue bundle into ghcr.io/go-tex/texmf/<name>:<version>, so the
+# default route to it is one this project controls rather than a third party's.
+#
+# The mirror is NOT a trust anchor: catalogue.go pins the archive's SHA-256 and
+# every client checks it whichever route delivered the bytes. This job checks the
+# same digest before pushing, so a bad upstream never becomes a bad mirror.
+#
+# ghcr push uses the workflow's own GITHUB_TOKEN: because the package is first
+# created by this repository's workflow, it is owned by the repository and the
+# token writes to it natively. Do NOT pre-create the package with a PAT — an
+# unlinked package refuses GITHUB_TOKEN.
+
+on:
+  workflow_dispatch:
+    inputs:
+      bundle:
+        description: "catalogue bundle to mirror"
+        required: true
+        default: beamer
+        type: choice
+        options: [beamer]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  mirror:
+    name: mirror ${{ inputs.bundle }} to ghcr
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
+
+      # Reads the pin out of the catalogue itself, so the workflow can never
+      # mirror a version or digest the Go code does not name.
+      - name: Read the pin from the catalogue
+        id: pin
+        run: go run ./cmd/texmf-pin ${{ inputs.bundle }} >> "$GITHUB_OUTPUT"
+
+      - name: Download and verify the upstream archive
+        run: |
+          curl -sSL --fail -o bundle.zip "${{ steps.pin.outputs.url }}"
+          echo "${{ steps.pin.outputs.sha256 }}  bundle.zip" | sha256sum -c -
+
+      - name: Install oras
+        run: |
+          curl -fsS https://pkgx.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Push the artifact
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "$GH_TOKEN" | pkgx oras login ghcr.io -u "${{ github.actor }}" --password-stdin
+          pkgx oras push \
+            "ghcr.io/go-tex/texmf/${{ inputs.bundle }}:${{ steps.pin.outputs.version }}" \
+            --artifact-type application/vnd.go-tex.texmf.bundle.v1 \
+            --annotation "org.opencontainers.image.source=https://github.com/go-tex/texmf" \
+            --annotation "org.opencontainers.image.version=${{ steps.pin.outputs.version }}" \
+            --annotation "vnd.go-tex.texmf.upstream=${{ steps.pin.outputs.url }}" \
+            --annotation "vnd.go-tex.texmf.sha256=${{ steps.pin.outputs.sha256 }}" \
+            bundle.zip:application/zip
+
+      # Proves the mirror answers with the pinned bytes, through the module's own
+      # OCI client — the same code a user runs. A push that publishes something
+      # the client cannot read is not a published bundle.
+      - name: Pull it back through the module's own client
+        env:
+          TEXMF_NETWORK: "1"
+        run: go test -run TestMirrorMatchesThePin -v ./...

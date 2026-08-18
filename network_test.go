@@ -53,3 +53,42 @@ func TestUpstreamPinsStillHold(t *testing.T) {
 		})
 	}
 }
+
+// TestMirrorMatchesThePin is what the publish workflow runs after pushing: it
+// pulls the artifact back through this module's OWN client — the same code a
+// user runs — and checks it against the pin.
+//
+// A push that publishes something the client cannot read is not a published
+// bundle, and a mirror that serves other bytes than the pin is worse than no
+// mirror at all. Neither is visible from the push side.
+func TestMirrorMatchesThePin(t *testing.T) {
+	if os.Getenv("TEXMF_NETWORK") == "" {
+		t.Skip("TEXMF_NETWORK non défini: ce test contacte le réseau")
+	}
+	for _, b := range []Bundle{Beamer} {
+		t.Run(b.Name+"@"+b.Version, func(t *testing.T) {
+			var oci Source
+			for _, s := range b.Sources {
+				if _, ok := s.(OCISource); ok {
+					oci = s
+					break
+				}
+			}
+			if oci == nil {
+				t.Skipf("%s n'a pas de route de registre", b.Name)
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+			defer cancel()
+			data, err := oci.Fetch(ctx)
+			if err != nil {
+				t.Fatalf("%s: %v", oci.Describe(), err)
+			}
+			sum := sha256.Sum256(data)
+			if got := hex.EncodeToString(sum[:]); got != b.SHA256 {
+				t.Fatalf("%s: condensat %s, épinglé %s — le miroir ne sert pas les octets épinglés",
+					oci.Describe(), got, b.SHA256)
+			}
+			t.Logf("%s: %d octets, condensat conforme", oci.Describe(), len(data))
+		})
+	}
+}
