@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"os"
+	"strings"
 	"testing"
 	"time"
 )
@@ -81,7 +82,19 @@ func TestMirrorMatchesThePin(t *testing.T) {
 			defer cancel()
 			data, err := oci.Fetch(ctx)
 			if err != nil {
-				t.Fatalf("%s: %v", oci.Describe(), err)
+				// A newly created ghcr package is PRIVATE, and an anonymous pull
+				// of one answers 401 — which is what this looks like the first
+				// time a bundle is mirrored. Say so, because "401 Unauthorized"
+				// on its own reads like a credentials problem in the job that
+				// just pushed successfully.
+				hint := ""
+				if strings.Contains(err.Error(), "401") {
+					hint = "\n\nUn 401 anonyme sur un paquet fraîchement publié signifie " +
+						"presque toujours qu'il est encore PRIVÉ. GitHub ne permet pas de " +
+						"changer la visibilité d'un paquet conteneur par API : il faut le " +
+						"faire dans les réglages du paquet, puis relancer ce job."
+				}
+				t.Fatalf("%s: %v%s", oci.Describe(), err, hint)
 			}
 			sum := sha256.Sum256(data)
 			if got := hex.EncodeToString(sum[:]); got != b.SHA256 {
