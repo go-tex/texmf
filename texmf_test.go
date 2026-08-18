@@ -500,7 +500,11 @@ func TestBundleDirUsesTheUserCacheByDefault(t *testing.T) {
 	if got != want {
 		t.Errorf("bundleDir = %q, attendu %q", got, want)
 	}
-	if got, err := bundleDir(Beamer, Options{CacheDir: "/tmp/zz"}); err != nil || got != "/tmp/zz/beamer@"+Beamer.Version {
+	// filepath.Join, not a string built with slashes: this test runs on Windows
+	// too, where the separator is not "/".
+	custom := filepath.Join(t.TempDir(), "zz")
+	if got, err := bundleDir(Beamer, Options{CacheDir: custom}); err != nil ||
+		got != filepath.Join(custom, "beamer@"+Beamer.Version) {
 		t.Errorf("bundleDir(CacheDir) = %q, %v", got, err)
 	}
 }
