@@ -72,6 +72,16 @@ digest check, keeping the files in memory instead:
 tree, err := texmf.OpenInMemory(ctx, texmf.Beamer, texmf.Options{})
 ```
 
+`OpenInMemory` still fetches, and **a browser cannot**: neither `ghcr.io` nor the
+GitHub release sends an `Access-Control-Allow-Origin` header (measured), so a page
+is refused by CORS. There the host fetches the bytes its own way — same-origin
+next to the page, a CDN that does send the header, the Cache API, a bundled asset
+— and hands them over:
+
+```go
+tree, err := texmf.FromArchive(data, texmf.Beamer)  // digest still decides
+```
+
 Under **node** or **wasip1** a real filesystem is bridged in (measured:
 `os.UserCacheDir`, `os.MkdirTemp` and `os.WriteFile` all succeed under node), so
 `Open` works there and is the better choice — it caches. Nothing is cached in

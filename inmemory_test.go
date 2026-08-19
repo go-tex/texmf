@@ -106,3 +106,35 @@ func TestOpenInMemoryPropagatesFailures(t *testing.T) {
 		t.Fatalf("erreur = %v", err)
 	}
 }
+
+// FromArchive is the entry a browser needs: neither ghcr.io nor the GitHub
+// release sends an Access-Control-Allow-Origin header, so a page cannot fetch
+// them itself — the bytes arrive some other way and this verifies them.
+func TestFromArchive(t *testing.T) {
+	data := buildZip(t, "tex/latex/zz/", map[string]string{"zz.cls": "bon\n", "zzb.sty": "% b\n"})
+	b := testBundle(t, data)
+
+	tree, err := FromArchive(data, b)
+	if err != nil {
+		t.Fatalf("FromArchive: %v", err)
+	}
+	if got := strings.Join(tree.Names(), ","); got != "zz.cls,zzb.sty" {
+		t.Errorf("Names() = %q", got)
+	}
+	if body, ok := tree.Resolve("zz.cls"); !ok || string(body) != "bon\n" {
+		t.Errorf("Resolve(zz.cls) = %q, %v", body, ok)
+	}
+
+	// The digest still decides, whoever fetched the bytes.
+	other := buildZip(t, "tex/latex/zz/", map[string]string{"zz.cls": "falsifié\n"})
+	if _, err := FromArchive(other, b); err == nil || !strings.Contains(err.Error(), "digest is") {
+		t.Errorf("erreur = %v, attendu un refus de condensat", err)
+	}
+
+	// And an archive with nothing under the prefix is an error, not an empty tree.
+	bad := buildZip(t, "tex/latex/autre/", map[string]string{"zz.cls": "bon\n"})
+	if _, err := FromArchive(bad, testBundle(t, bad)); err == nil ||
+		!strings.Contains(err.Error(), "no entries under") {
+		t.Errorf("erreur = %v", err)
+	}
+}

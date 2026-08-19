@@ -203,6 +203,27 @@ func OpenInMemory(ctx context.Context, b Bundle, opt Options) (*Tree, error) {
 	return &Tree{mem: files, cache: map[string][]byte{}}, nil
 }
 
+// FromArchive builds a Tree from bytes the caller already has, checking them
+// against the bundle's pinned digest. No network, no filesystem.
+//
+// This is the entry a BROWSER actually needs. Neither ghcr.io nor the GitHub
+// release sends an Access-Control-Allow-Origin header (measured), so a page
+// cannot fetch either of them itself — the bytes have to arrive some other way:
+// same-origin next to the page, a CDN that does send the header, the Cache API,
+// or a bundled asset. Whichever it is, the host does the fetching and this does
+// the verifying, so the digest still decides.
+func FromArchive(data []byte, b Bundle) (*Tree, error) {
+	sum := sha256.Sum256(data)
+	if got := hex.EncodeToString(sum[:]); got != b.SHA256 {
+		return nil, fmt.Errorf("texmf: %s@%s: digest is %s, expected %s", b.Name, b.Version, got, b.SHA256)
+	}
+	files, err := readZip(data, b.Prefix)
+	if err != nil {
+		return nil, fmt.Errorf("texmf: reading %s@%s: %w", b.Name, b.Version, err)
+	}
+	return &Tree{mem: files, cache: map[string][]byte{}}, nil
+}
+
 // bundleDir is where this exact bundle version lives.
 func bundleDir(b Bundle, opt Options) (string, error) {
 	root := opt.CacheDir
