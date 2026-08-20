@@ -31,9 +31,9 @@ const maxFileSize = 8 << 20
 // the .complete marker is written last, so an interrupted run leaves nothing
 // that a later one would mistake for a finished bundle.
 func extractZip(archive []byte, prefix, dir string) (int, error) {
-	zr, err := zip.NewReader(bytes.NewReader(archive), int64(len(archive)))
+	files, err := readZip(archive, prefix)
 	if err != nil {
-		return 0, fmt.Errorf("reading zip: %w", err)
+		return 0, err
 	}
 	if err := osMkdirAll(filepath.Dir(dir), 0o755); err != nil {
 		return 0, err
@@ -44,29 +44,14 @@ func extractZip(archive []byte, prefix, dir string) (int, error) {
 	}
 	defer osRemoveAll(tmp)
 
-	n := 0
-	for _, f := range zr.File {
-		if f.FileInfo().IsDir() || !strings.HasPrefix(f.Name, prefix) {
-			continue
-		}
-		base := path.Base(f.Name)
-		if base == "" || base == "." || base == ".." {
-			continue
-		}
-		data, err := readZipEntry(f)
-		if err != nil {
-			return 0, fmt.Errorf("%s: %w", f.Name, err)
-		}
+	for base, data := range files {
 		// filepath.Base again on the joined path so that no entry name, however
 		// crafted, can write outside tmp.
 		if err := osWriteFile(filepath.Join(tmp, filepath.Base(base)), data, 0o644); err != nil {
 			return 0, err
 		}
-		n++
 	}
-	if n == 0 {
-		return 0, fmt.Errorf("no entries under %q", prefix)
-	}
+	n := len(files)
 	if err := osWriteFile(filepath.Join(tmp, ".complete"), []byte(prefix+"\n"), 0o644); err != nil {
 		return 0, err
 	}
@@ -77,6 +62,37 @@ func extractZip(archive []byte, prefix, dir string) (int, error) {
 		return 0, err
 	}
 	return n, nil
+}
+
+// readZip reads every entry under prefix into a map keyed by base name. The
+// flattening is what the engine wants: TeX asks for "beamerbasetitle.sty", never
+// for a path, so a nested tree would only have to be walked again at every
+// lookup. It also means a TDS archive's doc/ and source/ trees — thousands of
+// files, none of which the engine opens — are never read at all.
+func readZip(archive []byte, prefix string) (map[string][]byte, error) {
+	zr, err := zip.NewReader(bytes.NewReader(archive), int64(len(archive)))
+	if err != nil {
+		return nil, fmt.Errorf("reading zip: %w", err)
+	}
+	out := map[string][]byte{}
+	for _, f := range zr.File {
+		if f.FileInfo().IsDir() || !strings.HasPrefix(f.Name, prefix) {
+			continue
+		}
+		base := path.Base(f.Name)
+		if base == "" || base == "." || base == ".." {
+			continue
+		}
+		data, err := readZipEntry(f)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", f.Name, err)
+		}
+		out[base] = data
+	}
+	if len(out) == 0 {
+		return nil, fmt.Errorf("no entries under %q", prefix)
+	}
+	return out, nil
 }
 
 // readZipEntry reads one entry, refusing anything over maxFileSize.

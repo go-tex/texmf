@@ -61,6 +61,32 @@ Only the files a TeX engine opens are extracted: `tex/latex/beamer/` and nothing
 else. A TDS archive's `doc/` and `source/` trees are thousands of files that
 never reach the disk.
 
+## In a browser
+
+`Open` extracts into the user cache, and Go's **js/wasm filesystem shim answers
+`ENOSYS`** to most calls — so it cannot run in a browser, which is exactly the host
+`Options.Resolve` exists to serve. `OpenInMemory` is the same fetch and the same
+digest check, keeping the files in memory instead:
+
+```go
+tree, err := texmf.OpenInMemory(ctx, texmf.Beamer, texmf.Options{})
+```
+
+`OpenInMemory` still fetches, and **a browser cannot**: neither `ghcr.io` nor the
+GitHub release sends an `Access-Control-Allow-Origin` header (measured), so a page
+is refused by CORS. There the host fetches the bytes its own way — same-origin
+next to the page, a CDN that does send the header, the Cache API, a bundled asset
+— and hands them over:
+
+```go
+tree, err := texmf.FromArchive(data, texmf.Beamer)  // digest still decides
+```
+
+Under **node** or **wasip1** a real filesystem is bridged in (measured:
+`os.UserCacheDir`, `os.MkdirTemp` and `os.WriteFile` all succeed under node), so
+`Open` works there and is the better choice — it caches. Nothing is cached in
+memory, so every `OpenInMemory` call fetches: keep the returned `Tree`.
+
 `Options.Offline` forbids every fetch: a cached bundle is used, an absent one
 returns `ErrNotCached`. That is what an air-gapped or reproducible build sets.
 

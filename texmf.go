@@ -98,11 +98,12 @@ type Tree struct {
 	dir   string
 	mu    sync.Mutex
 	cache map[string][]byte
-	names map[string]string // base name → path on disk
+	names map[string]string // base name → path on disk; nil when held in memory
+	mem   map[string][]byte // base name → contents; nil when extracted to disk
 }
 
-// Dir is where the tree was extracted. Useful for a caller that would rather put
-// it on TEXINPUTS than go through Resolve.
+// Dir is where the tree was extracted, or "" for a tree held in memory. Useful
+// for a caller that would rather put it on TEXINPUTS than go through Resolve.
 func (t *Tree) Dir() string { return t.dir }
 
 // Resolve returns the bytes of one file by its base name, which is how a TeX
@@ -115,6 +116,10 @@ func (t *Tree) Resolve(name string) ([]byte, bool) {
 	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
+	if t.mem != nil {
+		data, ok := t.mem[base]
+		return data, ok
+	}
 	if data, ok := t.cache[base]; ok {
 		return data, true
 	}
@@ -135,8 +140,15 @@ func (t *Tree) Resolve(name string) ([]byte, bool) {
 func (t *Tree) Names() []string {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	out := make([]string, 0, len(t.names))
-	for n := range t.names {
+	src := t.names
+	if t.mem != nil {
+		src = nil
+	}
+	out := make([]string, 0, len(src)+len(t.mem))
+	for n := range src {
+		out = append(out, n)
+	}
+	for n := range t.mem {
 		out = append(out, n)
 	}
 	sortStrings(out)
@@ -161,6 +173,55 @@ func Open(ctx context.Context, b Bundle, opt Options) (*Tree, error) {
 		}
 	}
 	return openTree(dir)
+}
+
+// OpenInMemory makes the bundle available without touching the filesystem: it
+// fetches the archive, checks the digest and keeps the files in memory.
+//
+// This is what a BROWSER needs. Go's js/wasm filesystem shim answers ENOSYS to
+// most calls, so Open — which extracts into the user cache — cannot run there,
+// even though the very reason Options.Resolve exists is to serve a host with no
+// filesystem. Under node or wasip1, where a real filesystem is bridged in, Open
+// works and is the better choice: it caches.
+//
+// Nothing is cached here, so every call fetches. A host that compiles more than
+// once should keep the returned Tree, or keep the bytes itself and answer from
+// its own store.
+func OpenInMemory(ctx context.Context, b Bundle, opt Options) (*Tree, error) {
+	if opt.Offline {
+		return nil, fmt.Errorf("%w: %s@%s (aucun cache en mémoire)", ErrNotCached, b.Name, b.Version)
+	}
+	data, err := fetchArchive(ctx, b, opt)
+	if err != nil {
+		return nil, err
+	}
+	files, err := readZip(data, b.Prefix)
+	if err != nil {
+		return nil, fmt.Errorf("texmf: reading %s@%s: %w", b.Name, b.Version, err)
+	}
+	logf(opt, "texmf: %s@%s ready in memory, %d files", b.Name, b.Version, len(files))
+	return &Tree{mem: files, cache: map[string][]byte{}}, nil
+}
+
+// FromArchive builds a Tree from bytes the caller already has, checking them
+// against the bundle's pinned digest. No network, no filesystem.
+//
+// This is the entry a BROWSER actually needs. Neither ghcr.io nor the GitHub
+// release sends an Access-Control-Allow-Origin header (measured), so a page
+// cannot fetch either of them itself — the bytes have to arrive some other way:
+// same-origin next to the page, a CDN that does send the header, the Cache API,
+// or a bundled asset. Whichever it is, the host does the fetching and this does
+// the verifying, so the digest still decides.
+func FromArchive(data []byte, b Bundle) (*Tree, error) {
+	sum := sha256.Sum256(data)
+	if got := hex.EncodeToString(sum[:]); got != b.SHA256 {
+		return nil, fmt.Errorf("texmf: %s@%s: digest is %s, expected %s", b.Name, b.Version, got, b.SHA256)
+	}
+	files, err := readZip(data, b.Prefix)
+	if err != nil {
+		return nil, fmt.Errorf("texmf: reading %s@%s: %w", b.Name, b.Version, err)
+	}
+	return &Tree{mem: files, cache: map[string][]byte{}}, nil
 }
 
 // bundleDir is where this exact bundle version lives.
@@ -191,11 +252,11 @@ func isPopulated(dir string) (bool, error) {
 	}
 }
 
-// fetchInto tries each source in turn, checks the digest, and extracts.
-func fetchInto(ctx context.Context, b Bundle, dir string, opt Options) error {
-	logf(opt, "texmf: %s@%s is not cached", b.Name, b.Version)
+// fetchArchive tries each source in turn and returns the first whose bytes match
+// the pinned digest. A source is a delivery route, never a trust anchor.
+func fetchArchive(ctx context.Context, b Bundle, opt Options) ([]byte, error) {
 	if len(b.Sources) == 0 {
-		return fmt.Errorf("texmf: %s@%s has no sources", b.Name, b.Version)
+		return nil, fmt.Errorf("texmf: %s@%s has no sources", b.Name, b.Version)
 	}
 	var errs []error
 	for _, src := range b.Sources {
@@ -213,14 +274,24 @@ func fetchInto(ctx context.Context, b Bundle, dir string, opt Options) error {
 			logf(opt, "texmf: %s failed: %v", src.Describe(), err)
 			continue
 		}
-		n, err := extractZip(data, b.Prefix, dir)
-		if err != nil {
-			return fmt.Errorf("texmf: extracting %s@%s: %w", b.Name, b.Version, err)
-		}
-		logf(opt, "texmf: %s@%s ready, %d files in %s", b.Name, b.Version, n, dir)
-		return nil
+		return data, nil
 	}
-	return fmt.Errorf("texmf: no source yielded %s@%s: %w", b.Name, b.Version, errors.Join(errs...))
+	return nil, fmt.Errorf("texmf: no source yielded %s@%s: %w", b.Name, b.Version, errors.Join(errs...))
+}
+
+// fetchInto fetches the archive and extracts it into dir.
+func fetchInto(ctx context.Context, b Bundle, dir string, opt Options) error {
+	logf(opt, "texmf: %s@%s is not cached", b.Name, b.Version)
+	data, err := fetchArchive(ctx, b, opt)
+	if err != nil {
+		return err
+	}
+	n, err := extractZip(data, b.Prefix, dir)
+	if err != nil {
+		return fmt.Errorf("texmf: extracting %s@%s: %w", b.Name, b.Version, err)
+	}
+	logf(opt, "texmf: %s@%s ready, %d files in %s", b.Name, b.Version, n, dir)
+	return nil
 }
 
 func logf(opt Options, format string, a ...any) {
