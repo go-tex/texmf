@@ -82,7 +82,14 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version: stable
-      - run: sudo apt-get update && sudo apt-get install -y qemu-user-static
+      # Bounded on purpose. On 2026-08-19 this step sat on an unreachable Ubuntu
+      # mirror for over an hour, in several repositories at once, and the lane
+      # reported "in progress" the whole time — a hung lane is indistinguishable
+      # from a slow one, and the default job timeout is six hours. Ten minutes
+      # turns an apt outage into a failure that can be read and re-run.
+      - name: Install qemu-user-static
+        timeout-minutes: 10
+        run: sudo apt-get update && sudo apt-get install -y qemu-user-static
       - name: Test under qemu (${{ matrix.goarch }})
         run: GOARCH=${{ matrix.goarch }} go test -exec=${{ matrix.qemu }} ./...
 
