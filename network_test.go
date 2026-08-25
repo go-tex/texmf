@@ -43,11 +43,11 @@ func TestUpstreamPinsStillHold(t *testing.T) {
 				t.Fatalf("%s: condensat %s, épinglé %s — l'amont a changé sous le pin",
 					src.Describe(), got, b.SHA256)
 			}
-			n, err := extractZip(data, b.Prefix, t.TempDir()+"/out")
+			n, err := extractZip(data, b.Prefixes, t.TempDir()+"/out")
 			if err != nil {
 				t.Fatalf("extraction: %v", err)
 			}
-			t.Logf("%s: %d fichiers sous %s", src.Describe(), n, b.Prefix)
+			t.Logf("%s: %d fichiers sous %v", src.Describe(), n, b.Prefixes)
 			if n < 50 {
 				t.Errorf("%d fichiers seulement — l'archive n'a pas la forme attendue", n)
 			}

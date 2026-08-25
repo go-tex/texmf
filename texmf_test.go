@@ -70,7 +70,7 @@ func serveZip(t *testing.T, data []byte) (url string, hits *int) {
 
 func testBundle(t *testing.T, data []byte, sources ...Source) Bundle {
 	t.Helper()
-	return Bundle{Name: "zztest", Version: "1.0", SHA256: digest(data), Prefix: "tex/latex/zz/", Sources: sources}
+	return Bundle{Name: "zztest", Version: "1.0", SHA256: digest(data), Prefixes: []string{"tex/latex/zz/"}, Sources: sources}
 }
 
 func TestOpenFetchesExtractsAndResolves(t *testing.T) {
@@ -185,7 +185,7 @@ func TestEverySourceFailing(t *testing.T) {
 }
 
 func TestNoSources(t *testing.T) {
-	b := Bundle{Name: "zzvide", Version: "1.0", Prefix: "tex/"}
+	b := Bundle{Name: "zzvide", Version: "1.0", Prefixes: []string{"tex/"}}
 	_, err := Open(context.Background(), b, Options{CacheDir: t.TempDir()})
 	if err == nil || !strings.Contains(err.Error(), "no sources") {
 		t.Fatalf("erreur = %v", err)
@@ -485,8 +485,13 @@ func TestBeamerCatalogueEntryIsConsistent(t *testing.T) {
 			t.Errorf("la route %q ne mentionne pas la version %s", s.Describe(), Beamer.Version)
 		}
 	}
-	if !strings.HasSuffix(Beamer.Prefix, "/") {
-		t.Errorf("le préfixe %q devrait finir par /", Beamer.Prefix)
+	for _, p := range Beamer.Prefixes {
+		if !strings.HasSuffix(p, "/") {
+			t.Errorf("le préfixe %q devrait finir par /", p)
+		}
+	}
+	if len(Beamer.Prefixes) == 0 {
+		t.Error("beamer ne nomme aucun préfixe")
 	}
 }
 
