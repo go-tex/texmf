@@ -54,10 +54,17 @@ type Bundle struct {
 	// exactly these bytes — a source is a delivery route, never a trust anchor.
 	SHA256 string
 
-	// Prefix is the archive directory holding the TeX macro files; only entries
-	// under it are extracted. Everything else in a TDS archive (documentation,
-	// sources, PDFs) is thousands of files the engine will never open.
-	Prefix string
+	// Prefixes are the archive directories holding the TeX macro files; only
+	// entries under one of them are extracted. Everything else in a TDS archive
+	// (documentation, sources, PDFs) is thousands of files the engine will never
+	// open.
+	//
+	// More than one is the normal case rather than the exception: a package that
+	// serves both plain TeX and LaTeX splits itself between tex/generic/<name>/
+	// and tex/latex/<name>/, and needs both halves to load. The files are
+	// flattened by base name on the way out, so the split does not survive into
+	// the tree the engine sees.
+	Prefixes []string
 }
 
 // A Source is one route to a bundle's archive bytes. Fetch must return the
@@ -195,7 +202,7 @@ func OpenInMemory(ctx context.Context, b Bundle, opt Options) (*Tree, error) {
 	if err != nil {
 		return nil, err
 	}
-	files, err := readZip(data, b.Prefix)
+	files, err := readZip(data, b.Prefixes)
 	if err != nil {
 		return nil, fmt.Errorf("texmf: reading %s@%s: %w", b.Name, b.Version, err)
 	}
@@ -217,7 +224,7 @@ func FromArchive(data []byte, b Bundle) (*Tree, error) {
 	if got := hex.EncodeToString(sum[:]); got != b.SHA256 {
 		return nil, fmt.Errorf("texmf: %s@%s: digest is %s, expected %s", b.Name, b.Version, got, b.SHA256)
 	}
-	files, err := readZip(data, b.Prefix)
+	files, err := readZip(data, b.Prefixes)
 	if err != nil {
 		return nil, fmt.Errorf("texmf: reading %s@%s: %w", b.Name, b.Version, err)
 	}
@@ -286,7 +293,7 @@ func fetchInto(ctx context.Context, b Bundle, dir string, opt Options) error {
 	if err != nil {
 		return err
 	}
-	n, err := extractZip(data, b.Prefix, dir)
+	n, err := extractZip(data, b.Prefixes, dir)
 	if err != nil {
 		return fmt.Errorf("texmf: extracting %s@%s: %w", b.Name, b.Version, err)
 	}

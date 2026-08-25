@@ -30,8 +30,8 @@ const maxFileSize = 8 << 20
 // The extraction goes to a temporary directory and is renamed into place, and
 // the .complete marker is written last, so an interrupted run leaves nothing
 // that a later one would mistake for a finished bundle.
-func extractZip(archive []byte, prefix, dir string) (int, error) {
-	files, err := readZip(archive, prefix)
+func extractZip(archive []byte, prefixes []string, dir string) (int, error) {
+	files, err := readZip(archive, prefixes)
 	if err != nil {
 		return 0, err
 	}
@@ -52,7 +52,7 @@ func extractZip(archive []byte, prefix, dir string) (int, error) {
 		}
 	}
 	n := len(files)
-	if err := osWriteFile(filepath.Join(tmp, ".complete"), []byte(prefix+"\n"), 0o644); err != nil {
+	if err := osWriteFile(filepath.Join(tmp, ".complete"), []byte(strings.Join(prefixes, " ")+"\n"), 0o644); err != nil {
 		return 0, err
 	}
 	if err := osRemoveAll(dir); err != nil {
@@ -64,19 +64,28 @@ func extractZip(archive []byte, prefix, dir string) (int, error) {
 	return n, nil
 }
 
-// readZip reads every entry under prefix into a map keyed by base name. The
+// readZip reads every entry under one of the prefixes into a map keyed by base
+// name. The
 // flattening is what the engine wants: TeX asks for "beamerbasetitle.sty", never
 // for a path, so a nested tree would only have to be walked again at every
 // lookup. It also means a TDS archive's doc/ and source/ trees — thousands of
 // files, none of which the engine opens — are never read at all.
-func readZip(archive []byte, prefix string) (map[string][]byte, error) {
+func readZip(archive []byte, prefixes []string) (map[string][]byte, error) {
 	zr, err := zip.NewReader(bytes.NewReader(archive), int64(len(archive)))
 	if err != nil {
 		return nil, fmt.Errorf("reading zip: %w", err)
 	}
 	out := map[string][]byte{}
 	for _, f := range zr.File {
-		if f.FileInfo().IsDir() || !strings.HasPrefix(f.Name, prefix) {
+		if f.FileInfo().IsDir() || !underAny(f.Name, prefixes) {
+			continue
+		}
+		if path.Ext(f.Name) == ".lua" {
+			// This module serves an engine with no Lua interpreter, so a .lua
+			// file in a TDS tree is one it can never open. Dropping them is not
+			// only tidy: they are also the ONLY source of base-name collisions
+			// pgf has (four, all in the graphdrawing libraries), and a collision
+			// in a flattened tree silently loses a file.
 			continue
 		}
 		base := path.Base(f.Name)
@@ -90,7 +99,7 @@ func readZip(archive []byte, prefix string) (map[string][]byte, error) {
 		out[base] = data
 	}
 	if len(out) == 0 {
-		return nil, fmt.Errorf("no entries under %q", prefix)
+		return nil, fmt.Errorf("no entries under %q", prefixes)
 	}
 	return out, nil
 }
@@ -126,4 +135,16 @@ func openTree(dir string) (*Tree, error) {
 		t.names[e.Name()] = filepath.Join(dir, e.Name())
 	}
 	return t, nil
+}
+
+// underAny reports whether name sits under one of the prefixes. An empty list
+// matches nothing, which is what a bundle that names no prefix deserves: it
+// would otherwise flatten a whole TDS archive, documentation and all.
+func underAny(name string, prefixes []string) bool {
+	for _, p := range prefixes {
+		if strings.HasPrefix(name, p) {
+			return true
+		}
+	}
+	return false
 }
