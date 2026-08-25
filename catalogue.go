@@ -42,6 +42,7 @@ var Beamer = Bundle{
 	Version:  beamerVersion,
 	SHA256:   "2ab4acf4c6be0d96d3f18161b08fd8e56ab54d380686f6440a42705e48c76f76",
 	Prefixes: []string{"tex/latex/beamer/"},
+	Provides: []string{"beamer", "beamerarticle"},
 	Sources: []Source{
 		OCISource{
 			Registry:   "ghcr.io",
@@ -79,6 +80,21 @@ var PGF = Bundle{
 	Version:  pgfVersion,
 	SHA256:   "d243b67705ab4f0e4fe91c4b26ed9da67cd7b0643fc38f158e91b600df9ba15e",
 	Prefixes: []string{"tex/generic/pgf/", "tex/latex/pgf/"},
+	// Every .sty the archive ships, so a document reaches pgf by whichever of
+	// its faces it names. tikz is the one that matters: it is how nearly every
+	// document asks for this bundle.
+	Provides: []string{
+		"tikz", "pgf", "pgfcore", "pgfmath", "pgfkeys", "pgffor", "pgfpages",
+		"pgfrcs", "pgfsys", "pgfparser", "pgfcalendar", "pgfpict2e", "pgfnodes",
+		"pgfarrows", "pgfautomata", "pgfheaps", "pgfshade", "xxcolor",
+		"tikzexternal", "pgfmanual",
+		"pgfbaseimage", "pgfbaselayers", "pgfbasematrix", "pgfbasepatterns",
+		"pgfbaseplot", "pgfbaseshapes", "pgfbasesnakes",
+		"pgflibraryarrows", "pgflibraryautomata", "pgflibraryplothandlers",
+		"pgflibraryplotmarks", "pgflibraryshapes", "pgflibrarysnakes",
+		"pgflibrarytikzbackgrounds", "pgflibrarytikztrees",
+		"pgfcomp-version-0-65", "pgfcomp-version-1-18",
+	},
 	Sources: []Source{
 		OCISource{
 			Registry:   "ghcr.io",
@@ -105,6 +121,10 @@ var PGFPlots = Bundle{
 	Version:  pgfplotsVersion,
 	SHA256:   "4c4f33e976ba01d3f635c92d0a697a70c2c8779d5bcaae3b3ec2fbd8c82cc7ce",
 	Prefixes: []string{"tex/generic/pgfplots/", "tex/latex/pgfplots/"},
+	// The archive ships six .sty files; the other four — a regression test, a
+	// bug-report template, an old-pgf shim and an assertion module — are
+	// internal and no document loads them by name.
+	Provides: []string{"pgfplots", "pgfplotstable"},
 	Sources: []Source{
 		OCISource{
 			Registry:   "ghcr.io",
@@ -157,10 +177,21 @@ var All = map[string]Bundle{
 	PGFPlots.Name: PGFPlots,
 }
 
-// Lookup returns a catalogue bundle by name.
+// Lookup returns the catalogue bundle that answers a name — its own, or one of
+// the package names it Provides. Matching only the bundle name would mean
+// \usepackage{tikz} reaches nothing, since no archive is called tikz.
 func Lookup(name string) (Bundle, bool) {
-	b, ok := All[name]
-	return b, ok
+	if b, ok := All[name]; ok {
+		return b, true
+	}
+	for _, b := range All {
+		for _, p := range b.Provides {
+			if p == name {
+				return b, true
+			}
+		}
+	}
+	return Bundle{}, false
 }
 
 // UpstreamURL returns the bundle's upstream route, which is by convention its

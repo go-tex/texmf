@@ -65,6 +65,16 @@ type Bundle struct {
 	// flattened by base name on the way out, so the split does not survive into
 	// the tree the engine sees.
 	Prefixes []string
+
+	// Provides are the package names a document may ask for by \usepackage that
+	// this bundle answers. A bundle is named for the distribution it comes from,
+	// and a document names the .sty file it wants — which is almost never the
+	// same word. No document writes \usepackage{pgf} to get TikZ; it writes
+	// \usepackage{tikz}, and pgf is the archive that holds tikz.sty.
+	//
+	// These are the .sty basenames the bundle ships, so the list is a fact about
+	// the archive rather than a guess about callers.
+	Provides []string
 }
 
 // A Source is one route to a bundle's archive bytes. Fetch must return the

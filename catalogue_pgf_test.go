@@ -120,3 +120,53 @@ func TestUpstreamURLWithoutAnHTTPSource(t *testing.T) {
 		t.Error("un bundle sans route HTTP ne devrait pas en annoncer une")
 	}
 }
+
+// A bundle is named for the distribution it comes from; a document names the
+// .sty file it wants, and the two are almost never the same word. Matching only
+// the bundle name meant \usepackage{tikz} reached nothing, since no archive is
+// called tikz — and tikz is how nearly every document asks for pgf.
+func TestLookupAnswersPackageNames(t *testing.T) {
+	for _, c := range []struct{ ask, want string }{
+		{"tikz", "pgf"},
+		{"pgf", "pgf"},
+		{"pgfkeys", "pgf"},
+		{"pgffor", "pgf"},
+		{"tikzexternal", "pgf"},
+		{"pgfplots", "pgfplots"},
+		{"pgfplotstable", "pgfplots"},
+		{"beamer", "beamer"},
+		{"beamerarticle", "beamer"},
+		{"fancyhdr", ""},
+		{"", ""},
+	} {
+		t.Run(c.ask, func(t *testing.T) {
+			b, ok := Lookup(c.ask)
+			if c.want == "" {
+				if ok {
+					t.Errorf("Lookup(%q) = %s, attendu aucun", c.ask, b.Name)
+				}
+				return
+			}
+			if !ok || b.Name != c.want {
+				t.Errorf("Lookup(%q) = (%s, %v), attendu %s", c.ask, b.Name, ok, c.want)
+			}
+		})
+	}
+}
+
+// A bundle answers its own name even when it is not in its own Provides list,
+// and no two bundles claim the same package name.
+func TestProvidesIsUnambiguous(t *testing.T) {
+	owner := map[string]string{}
+	for _, b := range All {
+		if got, ok := Lookup(b.Name); !ok || got.Name != b.Name {
+			t.Errorf("%s ne se retrouve pas par son propre nom", b.Name)
+		}
+		for _, p := range b.Provides {
+			if other, clash := owner[p]; clash {
+				t.Errorf("%q est revendiqué par %s et par %s", p, other, b.Name)
+			}
+			owner[p] = b.Name
+		}
+	}
+}
