@@ -25,7 +25,7 @@ on:
         required: true
         default: beamer
         type: choice
-        options: [beamer, pgf, pgfplots]
+        options: [beamer, pgf, pgfplots, translator]
 
 permissions:
   contents: read

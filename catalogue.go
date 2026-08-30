@@ -57,6 +57,45 @@ var Beamer = Bundle{
 	},
 }
 
+// translatorVersion is the pinned upstream release.
+const translatorVersion = "1.12d"
+
+// Translator is the translator package: the word-by-word translation mechanism
+// beamer loads for every talk (beamerbasetranslator.sty requires it and then
+// asks for six dictionaries).
+//
+// Without it a talk loses the words a theme puts on the slide rather than the
+// author: an undefined \translate leaves its own argument's braces behind, so
+// every theorem and definition was headed "{Theorem} 2." and "{Definition} 1."
+// instead of the language's own word — "Théorème", "Définition" — since the
+// dictionaries carry 21 languages and this corpus is full of talks that are not
+// in English.
+//
+// The route is the tag's own source archive rather than a release asset:
+// translator publishes no assets, and CTAN's install path
+// (install/macros/latex/contrib/translator.tds.zip) names no version — it serves
+// whatever is current, so it could not carry a pin. The archive's single prefix
+// therefore carries the version, which is what a GitHub source zip unpacks into.
+var Translator = Bundle{
+	Name:     "translator",
+	Version:  translatorVersion,
+	SHA256:   "89a7be175e1f8ae1b5ea479a22a7c2c0e02f95a6fb457ac97ffd9eaf7b573eba",
+	Prefixes: []string{"translator-" + translatorVersion + "/"},
+	Provides: []string{"translator"},
+	Sources: []Source{
+		OCISource{
+			Registry:   "ghcr.io",
+			Repository: "go-tex/texmf/translator",
+			Reference:  translatorVersion,
+			Label:      "ghcr.io/go-tex/texmf/translator:" + translatorVersion,
+		},
+		HTTPSource{
+			URL:   "https://github.com/josephwright/translator/archive/refs/tags/v" + translatorVersion + ".zip",
+			Label: "upstream tag josephwright/translator v" + translatorVersion,
+		},
+	},
+}
+
 // pgfVersion and pgfplotsVersion are the pinned upstream releases. Raising one
 // means raising its digest in the same commit — the two are one fact.
 const (
@@ -144,6 +183,7 @@ var PGFPlots = Bundle{
 // pins rather than in whatever program happens to fetch them.
 var Requires = map[string][]string{
 	PGFPlots.Name: {PGF.Name},
+	Beamer.Name:   {Translator.Name},
 }
 
 // WithDependencies returns b preceded by everything it requires, in load order
@@ -172,9 +212,10 @@ func WithDependencies(b Bundle) []Bundle {
 // from here rather than repeating it in YAML, so a mirror can never carry a
 // version or digest this code does not name.
 var All = map[string]Bundle{
-	Beamer.Name:   Beamer,
-	PGF.Name:      PGF,
-	PGFPlots.Name: PGFPlots,
+	Beamer.Name:     Beamer,
+	PGF.Name:        PGF,
+	PGFPlots.Name:   PGFPlots,
+	Translator.Name: Translator,
 }
 
 // Lookup returns the catalogue bundle that answers a name — its own, or one of
