@@ -71,11 +71,25 @@ func TestPGFPlotsRequiresPGF(t *testing.T) {
 
 // A bundle with no dependencies is returned alone, and nothing is repeated.
 func TestWithDependenciesIsStable(t *testing.T) {
-	if got := WithDependencies(Beamer); len(got) != 1 || got[0].Name != "beamer" {
-		t.Errorf("beamer seul attendu, obtenu %d entrées", len(got))
+	if got := WithDependencies(Translator); len(got) != 1 || got[0].Name != "translator" {
+		t.Errorf("translator seul attendu, obtenu %d entrées", len(got))
 	}
 	if got := WithDependencies(PGF); len(got) != 1 || got[0].Name != "pgf" {
 		t.Errorf("pgf seul attendu, obtenu %d entrées", len(got))
+	}
+}
+
+// beamer requires translator: beamerbasetranslator.sty loads it for every talk,
+// and without it a theme's own words — Theorem, Definition, Example — reach the
+// slide as the braces of an undefined \translate.
+func TestBeamerRequiresTranslator(t *testing.T) {
+	got := WithDependencies(Beamer)
+	if len(got) != 2 || got[0].Name != "translator" || got[1].Name != "beamer" {
+		var names []string
+		for _, b := range got {
+			names = append(names, b.Name)
+		}
+		t.Fatalf("obtenu %v, attendu [translator beamer] dans cet ordre", names)
 	}
 }
 
