@@ -44,25 +44,25 @@ func TestPrintsThePinAsWorkflowOutputs(t *testing.T) {
 	}
 	for _, key := range []string{"version=", "sha256=", "url="} {
 		if !strings.Contains(out, key) {
-			t.Errorf("sortie sans %q:\n%s", key, out)
+			t.Errorf("output without %q:\n%s", key, out)
 		}
 	}
 	if strings.Count(out, "\n") != 3 {
-		t.Errorf("attendu 3 lignes, obtenu:\n%s", out)
+		t.Errorf("want 3 lines, got:\n%s", out)
 	}
 	if !strings.Contains(out, "sha256=2ab4acf4") {
-		t.Errorf("le condensat épinglé n'apparaît pas:\n%s", out)
+		t.Errorf("the pinned digest does not appear:\n%s", out)
 	}
 }
 
 func TestRefusesBadUsage(t *testing.T) {
 	for _, args := range [][]string{{}, {"a", "b"}} {
 		if _, code := capture(t, args); code != 2 {
-			t.Errorf("run(%v) = %d, attendu 2", args, code)
+			t.Errorf("run(%v) = %d, want 2", args, code)
 		}
 	}
 	if _, code := capture(t, []string{"inconnu"}); code != 1 {
-		t.Errorf("un paquet inconnu devrait rendre 1")
+		t.Errorf("an unknown package must return 1")
 	}
 }
 
@@ -99,6 +99,6 @@ func TestBundleWithoutAnUpstreamRoute(t *testing.T) {
 	texmf.All["zzsansamont"] = texmf.Bundle{Name: "zzsansamont", Version: "1.0"}
 	defer delete(texmf.All, "zzsansamont")
 	if _, code := capture(t, []string{"zzsansamont"}); code != 1 {
-		t.Errorf("code = %d, attendu 1", code)
+		t.Errorf("code = %d, want 1", code)
 	}
 }

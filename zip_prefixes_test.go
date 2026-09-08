@@ -47,16 +47,16 @@ func TestReadZipTakesEveryPrefix(t *testing.T) {
 	}
 	for _, want := range []string{"core.code.tex", "extra.code.tex", "zz.sty"} {
 		if _, ok := files[want]; !ok {
-			t.Errorf("%s manque", want)
+			t.Errorf("%s is missing", want)
 		}
 	}
 	for _, unwanted := range []string{"ignore.tex", "manual.pdf"} {
 		if _, ok := files[unwanted]; ok {
-			t.Errorf("%s a été extrait alors qu'il est hors des préfixes", unwanted)
+			t.Errorf("%s was extracted although it is outside the prefixes", unwanted)
 		}
 	}
 	if len(files) != 3 {
-		t.Errorf("%d fichiers extraits, attendu 3", len(files))
+		t.Errorf("%d files extracted, want 3", len(files))
 	}
 }
 
@@ -69,7 +69,7 @@ func TestReadZipDescendsIntoSubdirectories(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, ok := files["deep.code.tex"]; !ok {
-		t.Error("un fichier profond n'a pas été extrait")
+		t.Error("a deep file was not extracted")
 	}
 }
 
@@ -87,10 +87,10 @@ func TestReadZipDropsLuaFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(files) != 1 {
-		t.Errorf("%d fichiers, attendu 1 (les .lua sont écartés)", len(files))
+		t.Errorf("%d files, want 1 (.lua are dropped)", len(files))
 	}
 	if _, ok := files["real.code.tex"]; !ok {
-		t.Error("le fichier TeX manque")
+		t.Error("the TeX file is missing")
 	}
 }
 
@@ -98,6 +98,6 @@ func TestReadZipDropsLuaFiles(t *testing.T) {
 func TestReadZipWithNoPrefixMatchesNothing(t *testing.T) {
 	data := zipOf(t, "tex/generic/zz/a.tex")
 	if _, err := readZip(data, nil); err == nil {
-		t.Error("une liste de préfixes vide devrait échouer plutôt que tout extraire")
+		t.Error("an empty prefix list must fail rather than extract everything")
 	}
 }

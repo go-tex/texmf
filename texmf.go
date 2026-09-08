@@ -206,7 +206,7 @@ func Open(ctx context.Context, b Bundle, opt Options) (*Tree, error) {
 // its own store.
 func OpenInMemory(ctx context.Context, b Bundle, opt Options) (*Tree, error) {
 	if opt.Offline {
-		return nil, fmt.Errorf("%w: %s@%s (aucun cache en mémoire)", ErrNotCached, b.Name, b.Version)
+		return nil, fmt.Errorf("%w: %s@%s (no in-memory cache)", ErrNotCached, b.Name, b.Version)
 	}
 	data, err := fetchArchive(ctx, b, opt)
 	if err != nil {
