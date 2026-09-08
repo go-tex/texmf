@@ -22,7 +22,7 @@ import (
 // the seams in seams.go. An error path that has never run is an error path that
 // has never been shown to work.
 
-var errBoom = errors.New("panne simulée")
+var errBoom = errors.New("simulated failure")
 
 // swap replaces a seam for the length of one test.
 func swap[T any](t *testing.T, p *T, v T) {
@@ -55,19 +55,19 @@ func TestExtractionSurvivesNothingWhenTheDiskRefuses(t *testing.T) {
 			t.Errorf("erreur = %v", err)
 		}
 	})
-	t.Run("répertoire temporaire", func(t *testing.T) {
+	t.Run("temporary directory", func(t *testing.T) {
 		swap(t, &osMkdirTemp, func(string, string) (string, error) { return "", errBoom })
 		if err := openWith(t, data); !errors.Is(err, errBoom) {
 			t.Errorf("erreur = %v", err)
 		}
 	})
-	t.Run("écriture d'un fichier", func(t *testing.T) {
+	t.Run("writing a file", func(t *testing.T) {
 		swap(t, &osWriteFile, func(string, []byte, fs.FileMode) error { return errBoom })
 		if err := openWith(t, data); !errors.Is(err, errBoom) {
 			t.Errorf("erreur = %v", err)
 		}
 	})
-	t.Run("écriture du marqueur", func(t *testing.T) {
+	t.Run("writing the marker", func(t *testing.T) {
 		real := osWriteFile
 		swap(t, &osWriteFile, func(name string, b []byte, m fs.FileMode) error {
 			if filepath.Base(name) == ".complete" {
@@ -79,7 +79,7 @@ func TestExtractionSurvivesNothingWhenTheDiskRefuses(t *testing.T) {
 			t.Errorf("erreur = %v", err)
 		}
 	})
-	t.Run("suppression de l'ancien répertoire", func(t *testing.T) {
+	t.Run("removing the old directory", func(t *testing.T) {
 		real := osRemoveAll
 		swap(t, &osRemoveAll, func(p string) error {
 			if strings.Contains(filepath.Base(p), ".tmp-") {
@@ -97,7 +97,7 @@ func TestExtractionSurvivesNothingWhenTheDiskRefuses(t *testing.T) {
 			t.Errorf("erreur = %v", err)
 		}
 	})
-	t.Run("lecture du répertoire extrait", func(t *testing.T) {
+	t.Run("reading the extracted directory", func(t *testing.T) {
 		swap(t, &osReadDir, func(string) ([]os.DirEntry, error) { return nil, errBoom })
 		if err := openWith(t, data); !errors.Is(err, errBoom) {
 			t.Errorf("erreur = %v", err)
@@ -142,15 +142,15 @@ func TestResolveWhenTheFileVanishes(t *testing.T) {
 	}
 	swap(t, &osReadFile, func(string) ([]byte, error) { return nil, errBoom })
 	if _, ok := tree.Resolve("zz.cls"); ok {
-		t.Error("Resolve devrait échouer quand le fichier a disparu")
+		t.Error("Resolve must fail when the file has gone")
 	}
 	// And an already-cached file is still served: the read happened once.
 	*(&osReadFile) = os.ReadFile
 	if _, ok := tree.Resolve("zz.cls"); !ok {
-		t.Error("Resolve devrait relire le fichier revenu")
+		t.Error("Resolve must re-read the file once it is back")
 	}
 	if _, ok := tree.Resolve("zz.cls"); !ok {
-		t.Error("le second appel devrait servir depuis le cache mémoire")
+		t.Error("the second call must be served from the memory cache")
 	}
 }
 
@@ -175,7 +175,7 @@ func TestCorruptEntryData(t *testing.T) {
 	b := testBundle(t, raw, HTTPSource{URL: url, Label: "amont"})
 	_, err := Open(context.Background(), b, Options{CacheDir: t.TempDir()})
 	if err == nil {
-		t.Fatal("une entrée corrompue a été acceptée")
+		t.Fatal("a corrupt entry was accepted")
 	}
 }
 
@@ -197,13 +197,13 @@ func TestDegenerateEntryNames(t *testing.T) {
 		t.Fatal(err)
 	}
 	if got := tree.Names(); len(got) != 1 || got[0] != "zz.cls" {
-		t.Errorf("Names() = %v, attendu [zz.cls]", got)
+		t.Errorf("Names() = %v, want [zz.cls]", got)
 	}
 }
 
 func TestOpenTreeOnAMissingDirectory(t *testing.T) {
 	if _, err := openTree(filepath.Join(t.TempDir(), "absent")); err == nil {
-		t.Error("openTree devrait échouer sur un répertoire absent")
+		t.Error("openTree must fail on a missing directory")
 	}
 }
 
@@ -213,14 +213,14 @@ func TestOpenTreeOnAMissingDirectory(t *testing.T) {
 func TestRequestConstructionFailures(t *testing.T) {
 	bad := "http://\x7f/"
 	if _, err := (HTTPSource{URL: bad}).Fetch(context.Background()); err == nil {
-		t.Error("HTTPSource: une URL illégale devrait échouer")
+		t.Error("HTTPSource: an illegal URL must fail")
 	}
 	s := OCISource{Registry: "\x7f", Repository: "zz", Reference: "1.0"}
 	if _, err := s.token(context.Background(), http.DefaultClient, "http://\x7f"); err == nil {
-		t.Error("token: une URL illégale devrait échouer")
+		t.Error("token: an illegal URL must fail")
 	}
 	if _, err := s.get(context.Background(), http.DefaultClient, bad, "", "*/*"); err == nil {
-		t.Error("get: une URL illégale devrait échouer")
+		t.Error("get: an illegal URL must fail")
 	}
 }
 
@@ -233,11 +233,11 @@ func TestTruncatedResponses(t *testing.T) {
 	}))
 	defer srv.Close()
 	if _, err := (HTTPSource{URL: srv.URL}).Fetch(context.Background()); err == nil {
-		t.Error("HTTPSource: un corps tronqué devrait échouer")
+		t.Error("HTTPSource: a truncated body must fail")
 	}
 	s := OCISource{Registry: strings.TrimPrefix(srv.URL, "http://"), Repository: "zz", Reference: "1.0"}
 	if _, err := s.get(context.Background(), srv.Client(), srv.URL, "", "*/*"); err == nil {
-		t.Error("get: un corps tronqué devrait échouer")
+		t.Error("get: a truncated body must fail")
 	}
 }
 
@@ -260,7 +260,7 @@ func TestOCIBlobTooLarge(t *testing.T) {
 func TestTokenEndpointUnreachable(t *testing.T) {
 	s := OCISource{Registry: "127.0.0.1:1", Repository: "zz", Reference: "1.0"}
 	if _, err := s.token(context.Background(), http.DefaultClient, "http://127.0.0.1:1"); err == nil {
-		t.Error("un point de terminaison injoignable devrait remonter l'erreur")
+		t.Error("an unreachable endpoint must surface the error")
 	}
 }
 
@@ -284,7 +284,7 @@ func TestUnsupportedCompressionMethod(t *testing.T) {
 	url, _ := serveZip(t, data)
 	b := testBundle(t, data, HTTPSource{URL: url, Label: "amont"})
 	if _, err := Open(context.Background(), b, Options{CacheDir: t.TempDir()}); err == nil {
-		t.Fatal("une méthode de compression inconnue a été acceptée")
+		t.Fatal("an unknown compression method was accepted")
 	}
 }
 
@@ -306,7 +306,7 @@ func TestEntryNamedDotDotIsSkipped(t *testing.T) {
 		t.Fatal(err)
 	}
 	if got := tree.Names(); len(got) != 1 || got[0] != "zz.cls" {
-		t.Errorf("Names() = %v, attendu [zz.cls]", got)
+		t.Errorf("Names() = %v, want [zz.cls]", got)
 	}
 }
 
@@ -315,6 +315,6 @@ func TestEntryNamedDotDotIsSkipped(t *testing.T) {
 func TestGetOnAnUnreachableHost(t *testing.T) {
 	s := OCISource{Registry: "127.0.0.1:1", Repository: "zz", Reference: "1.0"}
 	if _, err := s.get(context.Background(), http.DefaultClient, "http://127.0.0.1:1/v2/", "", "*/*"); err == nil {
-		t.Error("un hôte injoignable devrait échouer")
+		t.Error("an unreachable host must fail")
 	}
 }

@@ -39,7 +39,7 @@ func TestOpenInMemoryResolvesWithoutTouchingTheDisk(t *testing.T) {
 		t.Fatalf("OpenInMemory: %v", err)
 	}
 	if got := tree.Dir(); got != "" {
-		t.Errorf("Dir() = %q, attendu vide pour un arbre en mémoire", got)
+		t.Errorf("Dir() = %q, want empty for an in-memory tree", got)
 	}
 	if got := strings.Join(tree.Names(), ","); got != "zz.cls,zzbase.sty" {
 		t.Errorf("Names() = %q", got)
@@ -49,20 +49,20 @@ func TestOpenInMemoryResolvesWithoutTouchingTheDisk(t *testing.T) {
 		t.Errorf("Resolve(zzbase.sty) = %q, %v", body, ok)
 	}
 	if _, ok := tree.Resolve("chemin/vers/zz.cls"); !ok {
-		t.Error("un chemin devrait se résoudre par son nom de base")
+		t.Error("a path must resolve by its base name")
 	}
 	if _, ok := tree.Resolve("absent.sty"); ok {
-		t.Error("un nom inconnu ne devrait pas se résoudre")
+		t.Error("an unknown name must not resolve")
 	}
 	if *hits != 1 {
-		t.Errorf("%d requêtes, attendu 1", *hits)
+		t.Errorf("%d requests, want 1", *hits)
 	}
 }
 
 // The digest is checked here too: an in-memory tree is not a looser one.
 func TestOpenInMemoryRefusesAWrongDigest(t *testing.T) {
 	data := buildZip(t, "tex/latex/zz/", map[string]string{"zz.cls": "bon\n"})
-	other := buildZip(t, "tex/latex/zz/", map[string]string{"zz.cls": "falsifié\n"})
+	other := buildZip(t, "tex/latex/zz/", map[string]string{"zz.cls": "tampered\n"})
 	url, _ := serveZip(t, other)
 	b := testBundle(t, data, HTTPSource{URL: url, Label: "menteur"})
 	if _, err := OpenInMemory(context.Background(), b, Options{}); err == nil ||
@@ -79,10 +79,10 @@ func TestOpenInMemoryOffline(t *testing.T) {
 	b := testBundle(t, data, HTTPSource{URL: url, Label: "amont"})
 	_, err := OpenInMemory(context.Background(), b, Options{Offline: true})
 	if !errors.Is(err, ErrNotCached) {
-		t.Fatalf("erreur = %v, attendu ErrNotCached", err)
+		t.Fatalf("error = %v, want ErrNotCached", err)
 	}
 	if *hits != 0 {
-		t.Errorf("le mode hors ligne a émis %d requête(s)", *hits)
+		t.Errorf("offline mode issued %d request(s)", *hits)
 	}
 }
 
@@ -126,9 +126,9 @@ func TestFromArchive(t *testing.T) {
 	}
 
 	// The digest still decides, whoever fetched the bytes.
-	other := buildZip(t, "tex/latex/zz/", map[string]string{"zz.cls": "falsifié\n"})
+	other := buildZip(t, "tex/latex/zz/", map[string]string{"zz.cls": "tampered\n"})
 	if _, err := FromArchive(other, b); err == nil || !strings.Contains(err.Error(), "digest is") {
-		t.Errorf("erreur = %v, attendu un refus de condensat", err)
+		t.Errorf("error = %v, want a digest refusal", err)
 	}
 
 	// And an archive with nothing under the prefix is an error, not an empty tree.

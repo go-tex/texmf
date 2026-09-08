@@ -96,17 +96,17 @@ func TestOpenFetchesExtractsAndResolves(t *testing.T) {
 	}
 	// TeX asks by base name, but a path must resolve too.
 	if _, ok := tree.Resolve("some/where/zz.cls"); !ok {
-		t.Error("un chemin devrait se résoudre par son nom de base")
+		t.Error("a path must resolve by its base name")
 	}
 	if _, ok := tree.Resolve("absent.sty"); ok {
-		t.Error("un nom inconnu ne devrait pas se résoudre")
+		t.Error("an unknown name must not resolve")
 	}
 	// The documentation and sources of a TDS archive must not have been written.
 	if _, err := os.Stat(filepath.Join(tree.Dir(), "beameruserguide.pdf")); !os.IsNotExist(err) {
-		t.Error("un fichier hors préfixe a été extrait")
+		t.Error("a file outside the prefixes was extracted")
 	}
 	if *hits != 1 {
-		t.Errorf("l'archive a été téléchargée %d fois", *hits)
+		t.Errorf("the archive was downloaded %d times", *hits)
 	}
 
 	// A second Open uses the cache: no further request.
@@ -114,7 +114,7 @@ func TestOpenFetchesExtractsAndResolves(t *testing.T) {
 		t.Fatalf("second Open: %v", err)
 	}
 	if *hits != 1 {
-		t.Errorf("le cache n'a pas servi: %d requêtes", *hits)
+		t.Errorf("the cache was not used: %d requests", *hits)
 	}
 }
 
@@ -122,17 +122,17 @@ func TestOpenFetchesExtractsAndResolves(t *testing.T) {
 // however well it answers.
 func TestWrongDigestIsRefused(t *testing.T) {
 	data := buildZip(t, "tex/latex/zz/", map[string]string{"zz.cls": "bon\n"})
-	other := buildZip(t, "tex/latex/zz/", map[string]string{"zz.cls": "falsifié\n"})
+	other := buildZip(t, "tex/latex/zz/", map[string]string{"zz.cls": "tampered\n"})
 	url, _ := serveZip(t, other)
 	b := testBundle(t, data, HTTPSource{URL: url, Label: "menteur"})
 
 	dir := t.TempDir()
 	_, err := Open(context.Background(), b, Options{CacheDir: dir})
 	if err == nil {
-		t.Fatal("une archive au mauvais condensat a été acceptée")
+		t.Fatal("an archive with the wrong digest was accepted")
 	}
 	if !strings.Contains(err.Error(), "digest is") {
-		t.Errorf("erreur = %v, attendu un refus de condensat", err)
+		t.Errorf("error = %v, want a digest refusal", err)
 	}
 }
 
@@ -156,14 +156,14 @@ func TestFallsBackToTheNextSource(t *testing.T) {
 		t.Fatalf("Open: %v", err)
 	}
 	if _, ok := tree.Resolve("zz.cls"); !ok {
-		t.Error("le repli n'a pas fourni le fichier")
+		t.Error("the fallback did not supply the file")
 	}
 	if *hits != 1 {
-		t.Errorf("l'amont a été appelé %d fois", *hits)
+		t.Errorf("upstream was called %d times", *hits)
 	}
 	joined := strings.Join(log, "\n")
 	if !strings.Contains(joined, "registre failed") || !strings.Contains(joined, "trying amont") {
-		t.Errorf("le journal ne rend pas compte du repli:\n%s", joined)
+		t.Errorf("the log does not account for the fallback:\n%s", joined)
 	}
 }
 
@@ -180,7 +180,7 @@ func TestEverySourceFailing(t *testing.T) {
 	}
 	// Both failures must be reported, not only the last.
 	if !strings.Contains(err.Error(), "a:") || !strings.Contains(err.Error(), "b:") {
-		t.Errorf("les deux échecs devraient être rapportés: %v", err)
+		t.Errorf("both failures must be reported: %v", err)
 	}
 }
 
@@ -202,19 +202,19 @@ func TestOfflineUsesOnlyTheCache(t *testing.T) {
 
 	_, err := Open(context.Background(), b, Options{CacheDir: dir, Offline: true})
 	if !errors.Is(err, ErrNotCached) {
-		t.Fatalf("hors ligne sans cache: erreur = %v, attendu ErrNotCached", err)
+		t.Fatalf("offline with no cache: error = %v, want ErrNotCached", err)
 	}
 	if *hits != 0 {
-		t.Fatalf("le mode hors ligne a émis %d requête(s)", *hits)
+		t.Fatalf("offline mode issued %d request(s)", *hits)
 	}
 	if _, err := Open(context.Background(), b, Options{CacheDir: dir}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := Open(context.Background(), b, Options{CacheDir: dir, Offline: true}); err != nil {
-		t.Fatalf("hors ligne avec cache: %v", err)
+		t.Fatalf("offline with a cache: %v", err)
 	}
 	if *hits != 1 {
-		t.Errorf("%d requêtes au total, attendu 1", *hits)
+		t.Errorf("%d requests in total, want 1", *hits)
 	}
 }
 
@@ -247,12 +247,12 @@ func TestPartialExtractionIsNotTakenForComplete(t *testing.T) {
 		t.Fatal(err)
 	}
 	if *hits != 2 {
-		t.Errorf("%d requêtes, attendu 2 — l'extraction partielle aurait dû être refaite", *hits)
+		t.Errorf("%d requests, want 2 — the partial extraction should have been redone", *hits)
 	}
 }
 
 func TestCorruptArchive(t *testing.T) {
-	data := []byte("ceci n'est pas un zip")
+	data := []byte("this is not a zip")
 	url, _ := serveZip(t, data)
 	b := testBundle(t, data, HTTPSource{URL: url, Label: "amont"})
 	_, err := Open(context.Background(), b, Options{CacheDir: t.TempDir()})
@@ -287,11 +287,11 @@ func TestHTTPSourceDescribe(t *testing.T) {
 }
 
 func TestHTTPSourceBadRequest(t *testing.T) {
-	if _, err := (HTTPSource{URL: "://pas-une-url"}).Fetch(context.Background()); err == nil {
-		t.Error("une URL invalide devrait échouer")
+	if _, err := (HTTPSource{URL: "://not-a-url"}).Fetch(context.Background()); err == nil {
+		t.Error("an invalid URL must fail")
 	}
 	if _, err := (HTTPSource{URL: "http://127.0.0.1:1"}).Fetch(context.Background()); err == nil {
-		t.Error("un hôte injoignable devrait échouer")
+		t.Error("an unreachable host must fail")
 	}
 }
 
@@ -320,11 +320,11 @@ func ociServer(t *testing.T, repo, ref string, blob []byte, opts ...func(*ociOpt
 		switch {
 		case strings.HasPrefix(r.URL.Path, "/token"):
 			if o.noToken {
-				http.Error(w, "pas de jeton anonyme", http.StatusUnauthorized)
+				http.Error(w, "no anonymous token", http.StatusUnauthorized)
 				return
 			}
 			if o.badTokenBody {
-				w.Write([]byte("pas du json"))
+				w.Write([]byte("not json"))
 				return
 			}
 			json.NewEncoder(w).Encode(map[string]string{o.tokenField: o.token})
@@ -388,7 +388,7 @@ func TestOCISourcePullsTheLayer(t *testing.T) {
 			t.Fatalf("%s: %v", field, err)
 		}
 		if !bytes.Equal(got, data) {
-			t.Errorf("%s: couche différente de l'archive", field)
+			t.Errorf("%s: layer differs from the archive", field)
 		}
 	}
 }
@@ -419,7 +419,7 @@ func TestOCISourceWithoutAnonymousToken(t *testing.T) {
 			t.Fatalf("%v", err)
 		}
 		if !bytes.Equal(got, data) {
-			t.Error("couche différente de l'archive")
+			t.Error("layer differs from the archive")
 		}
 	}
 }
@@ -447,7 +447,7 @@ func TestOCISourceMissingArtifact(t *testing.T) {
 func TestOCISourceUnreachableRegistry(t *testing.T) {
 	src := OCISource{Registry: "127.0.0.1:1", Repository: "zz", Reference: "1.0"}
 	if _, err := src.Fetch(context.Background()); err == nil {
-		t.Error("un registre injoignable devrait échouer")
+		t.Error("an unreachable registry must fail")
 	}
 }
 
@@ -457,7 +457,7 @@ func TestOCISourceBadManifest(t *testing.T) {
 			json.NewEncoder(w).Encode(map[string]string{"token": "t"})
 			return
 		}
-		w.Write([]byte("pas du json"))
+		w.Write([]byte("not json"))
 	}))
 	defer srv.Close()
 	src := OCISource{Registry: strings.TrimPrefix(srv.URL, "http://"), Repository: "zz", Reference: "1.0"}
@@ -472,26 +472,26 @@ func TestOCISourceBadManifest(t *testing.T) {
 // here rather than at a user's first download.
 func TestBeamerCatalogueEntryIsConsistent(t *testing.T) {
 	if len(Beamer.SHA256) != 64 {
-		t.Errorf("SHA256 fait %d caractères", len(Beamer.SHA256))
+		t.Errorf("SHA256 is %d characters", len(Beamer.SHA256))
 	}
 	if _, err := hex.DecodeString(Beamer.SHA256); err != nil {
-		t.Errorf("SHA256 n'est pas hexadécimal: %v", err)
+		t.Errorf("SHA256 is not hexadecimal: %v", err)
 	}
 	if len(Beamer.Sources) != 2 {
-		t.Fatalf("%d routes, attendu 2", len(Beamer.Sources))
+		t.Fatalf("%d routes, want 2", len(Beamer.Sources))
 	}
 	for _, s := range Beamer.Sources {
 		if !strings.Contains(s.Describe(), Beamer.Version) {
-			t.Errorf("la route %q ne mentionne pas la version %s", s.Describe(), Beamer.Version)
+			t.Errorf("route %q does not mention version %s", s.Describe(), Beamer.Version)
 		}
 	}
 	for _, p := range Beamer.Prefixes {
 		if !strings.HasSuffix(p, "/") {
-			t.Errorf("le préfixe %q devrait finir par /", p)
+			t.Errorf("prefix %q is a path but does not end in /", p)
 		}
 	}
 	if len(Beamer.Prefixes) == 0 {
-		t.Error("beamer ne nomme aucun préfixe")
+		t.Error("beamer names no prefix")
 	}
 }
 
@@ -503,7 +503,7 @@ func TestBundleDirUsesTheUserCacheByDefault(t *testing.T) {
 	base, _ := os.UserCacheDir()
 	want := filepath.Join(base, "go-tex", "texmf", "beamer@"+Beamer.Version)
 	if got != want {
-		t.Errorf("bundleDir = %q, attendu %q", got, want)
+		t.Errorf("bundleDir = %q, want %q", got, want)
 	}
 	// filepath.Join, not a string built with slashes: this test runs on Windows
 	// too, where the separator is not "/".

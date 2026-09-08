@@ -24,7 +24,7 @@ import (
 // here instead.
 func TestUpstreamPinsStillHold(t *testing.T) {
 	if os.Getenv("TEXMF_NETWORK") == "" {
-		t.Skip("TEXMF_NETWORK non défini: ce test contacte le réseau")
+		t.Skip("TEXMF_NETWORK unset: this test reaches the network")
 	}
 	for _, b := range []Bundle{Beamer} {
 		t.Run(b.Name+"@"+b.Version, func(t *testing.T) {
@@ -40,7 +40,7 @@ func TestUpstreamPinsStillHold(t *testing.T) {
 			}
 			sum := sha256.Sum256(data)
 			if got := hex.EncodeToString(sum[:]); got != b.SHA256 {
-				t.Fatalf("%s: condensat %s, épinglé %s — l'amont a changé sous le pin",
+				t.Fatalf("%s: digest %s, pinned %s — upstream changed under the pin",
 					src.Describe(), got, b.SHA256)
 			}
 			n, err := extractArchive(data, b.Prefixes, t.TempDir()+"/out")
@@ -49,7 +49,7 @@ func TestUpstreamPinsStillHold(t *testing.T) {
 			}
 			t.Logf("%s: %d fichiers sous %v", src.Describe(), n, b.Prefixes)
 			if n < 50 {
-				t.Errorf("%d fichiers seulement — l'archive n'a pas la forme attendue", n)
+				t.Errorf("only %d files — the archive is not the shape expected", n)
 			}
 		})
 	}
@@ -64,7 +64,7 @@ func TestUpstreamPinsStillHold(t *testing.T) {
 // mirror at all. Neither is visible from the push side.
 func TestMirrorMatchesThePin(t *testing.T) {
 	if os.Getenv("TEXMF_NETWORK") == "" {
-		t.Skip("TEXMF_NETWORK non défini: ce test contacte le réseau")
+		t.Skip("TEXMF_NETWORK unset: this test reaches the network")
 	}
 	for _, b := range []Bundle{Beamer} {
 		t.Run(b.Name+"@"+b.Version, func(t *testing.T) {
@@ -89,16 +89,16 @@ func TestMirrorMatchesThePin(t *testing.T) {
 				// just pushed successfully.
 				hint := ""
 				if strings.Contains(err.Error(), "401") {
-					hint = "\n\nUn 401 anonyme sur un paquet fraîchement publié signifie " +
-						"presque toujours qu'il est encore PRIVÉ. GitHub ne permet pas de " +
-						"changer la visibilité d'un paquet conteneur par API : il faut le " +
-						"faire dans les réglages du paquet, puis relancer ce job."
+					hint = "\n\nAn anonymous 401 on a freshly published package means " +
+						"almost always that it is still PRIVATE. GitHub does not allow " +
+						"a container package's visibility cannot be changed through the API: do it " +
+						"in the package settings, then re-run this job."
 				}
 				t.Fatalf("%s: %v%s", oci.Describe(), err, hint)
 			}
 			sum := sha256.Sum256(data)
 			if got := hex.EncodeToString(sum[:]); got != b.SHA256 {
-				t.Fatalf("%s: condensat %s, épinglé %s — le miroir ne sert pas les octets épinglés",
+				t.Fatalf("%s: digest %s, pinned %s — the mirror is not serving the pinned bytes",
 					oci.Describe(), got, b.SHA256)
 			}
 			t.Logf("%s: %d octets, condensat conforme", oci.Describe(), len(data))
