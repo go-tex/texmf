@@ -216,6 +216,9 @@ var All = map[string]Bundle{
 	PGF.Name:        PGF,
 	PGFPlots.Name:   PGFPlots,
 	Translator.Name: Translator,
+
+	LinuxLibertine.Name: LinuxLibertine,
+	Libertinus.Name:     Libertinus,
 }
 
 // Lookup returns the catalogue bundle that answers a name — its own, or one of
@@ -245,4 +248,87 @@ func UpstreamURL(b Bundle) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// ── text fonts ──────────────────────────────────────────────────────────────
+//
+// A font bundle is here for the same reason a macro bundle is: without it the
+// engine sets the document in a face its author did not ask for, and WIDTH
+// decides how many words fit on a line, hence how long the document is.
+//
+// Measured on a controlled two-column acmart document — same text, same 9pt,
+// same block, same leading, and 57 lines per column in both engines — the
+// engine's built-in face set 4.619bp per character against Linux Libertine's
+// 3.990: 15.8% wider, 8.77 words to a line instead of 10.04, two extra pages out
+// of eight (go-tex/engine#310). With the font present the engine measures 4.584
+// against tectonic's 4.582.
+//
+// Only faces a reference build honours are worth fetching. Asked what it embeds
+// for each package, tectonic answers Latin Modern for times, mathptmx, txfonts
+// and helvet — the old PSNFSS packages name a Type1 family its XeTeX path does
+// not resolve — and the real face only for newtxtext, libertine and libertinus.
+
+// linuxLibertineVersion is the pinned upstream release. Raising it means raising
+// the digest in the same commit — the two are one fact.
+const linuxLibertineVersion = "5.3.0"
+
+// LinuxLibertine is the Linux Libertine and Linux Biolinum families in OpenType.
+//
+// acmart asks for them by name (\RequirePackage{libertine}), so every paper in
+// that class — the largest single family in the fidelity corpus — is set in
+// Libertine by any reference build and was not set in it here.
+//
+// The archive is the upstream OpenType release, a gzipped tar rather than a zip:
+// Linux Libertine publishes LinLibertineOTF_<version>_<date>.tgz and nothing
+// else. Its files sit at the archive ROOT, so the prefixes are the font-name
+// stems rather than a directory — which is also what keeps the licences and
+// changelogs beside them out of the tree.
+var LinuxLibertine = Bundle{
+	Name:     "linuxlibertine",
+	Version:  linuxLibertineVersion,
+	SHA256:   "3eb84d13e59d390a3f0b15f93bbb590de693dd5f29c4e8083317dbbadf6fb985",
+	Prefixes: []string{"LinLibertine_", "LinBiolinum_"},
+	Provides: []string{"libertine", "biolinum"},
+	Sources: []Source{
+		OCISource{
+			Registry:   "ghcr.io",
+			Repository: "go-tex/texmf/linuxlibertine",
+			Reference:  linuxLibertineVersion,
+			Label:      "ghcr.io/go-tex/texmf/linuxlibertine:" + linuxLibertineVersion,
+		},
+		HTTPSource{
+			URL: "https://downloads.sourceforge.net/project/linuxlibertine/linuxlibertine/" +
+				linuxLibertineVersion + "/LinLibertineOTF_" + linuxLibertineVersion + "_2012_07_02.tgz",
+			Label: "upstream release linuxlibertine " + linuxLibertineVersion,
+		},
+	},
+}
+
+// libertinusVersion is the pinned upstream release.
+const libertinusVersion = "7.051"
+
+// Libertinus is the Libertinus family, Linux Libertine's maintained successor
+// and what \usepackage{libertinus} asks for.
+//
+// Only static/OTF/ is taken: the release also carries variable fonts, web
+// formats, sources and documentation, none of which this engine opens.
+var Libertinus = Bundle{
+	Name:     "libertinus",
+	Version:  libertinusVersion,
+	SHA256:   "4d9be29b5cb380c35af8ba967abcc752ad1e07be1f738a9789c33e0dd7478c92",
+	Prefixes: []string{"Libertinus-" + libertinusVersion + "/static/OTF/"},
+	Provides: []string{"libertinus"},
+	Sources: []Source{
+		OCISource{
+			Registry:   "ghcr.io",
+			Repository: "go-tex/texmf/libertinus",
+			Reference:  libertinusVersion,
+			Label:      "ghcr.io/go-tex/texmf/libertinus:" + libertinusVersion,
+		},
+		HTTPSource{
+			URL: "https://github.com/alerque/libertinus/releases/download/v" + libertinusVersion +
+				"/Libertinus-" + libertinusVersion + ".zip",
+			Label: "upstream release alerque/libertinus v" + libertinusVersion,
+		},
+	},
 }

@@ -212,7 +212,7 @@ func OpenInMemory(ctx context.Context, b Bundle, opt Options) (*Tree, error) {
 	if err != nil {
 		return nil, err
 	}
-	files, err := readZip(data, b.Prefixes)
+	files, err := readArchive(data, b.Prefixes)
 	if err != nil {
 		return nil, fmt.Errorf("texmf: reading %s@%s: %w", b.Name, b.Version, err)
 	}
@@ -234,7 +234,7 @@ func FromArchive(data []byte, b Bundle) (*Tree, error) {
 	if got := hex.EncodeToString(sum[:]); got != b.SHA256 {
 		return nil, fmt.Errorf("texmf: %s@%s: digest is %s, expected %s", b.Name, b.Version, got, b.SHA256)
 	}
-	files, err := readZip(data, b.Prefixes)
+	files, err := readArchive(data, b.Prefixes)
 	if err != nil {
 		return nil, fmt.Errorf("texmf: reading %s@%s: %w", b.Name, b.Version, err)
 	}
@@ -303,7 +303,7 @@ func fetchInto(ctx context.Context, b Bundle, dir string, opt Options) error {
 	if err != nil {
 		return err
 	}
-	n, err := extractZip(data, b.Prefixes, dir)
+	n, err := extractArchive(data, b.Prefixes, dir)
 	if err != nil {
 		return fmt.Errorf("texmf: extracting %s@%s: %w", b.Name, b.Version, err)
 	}

@@ -29,9 +29,15 @@ func TestCatalogueEntriesAreComplete(t *testing.T) {
 			if len(b.Prefixes) == 0 {
 				t.Error("aucun préfixe : l'archive entière serait aplatie")
 			}
+			// A prefix is either a directory — and then it must end in "/", or
+			// "tex/latex/beam" would also match a beamx/ tree — or a bare name
+			// stem, for an archive whose files sit at its root. Linux Libertine
+			// publishes LinLibertineOTF_<version>.tgz with the .otf files and the
+			// licences side by side at the top level, so "LinLibertine_" is the
+			// only way to take the fonts and leave the changelogs.
 			for _, p := range b.Prefixes {
-				if !strings.HasSuffix(p, "/") {
-					t.Errorf("le préfixe %q devrait finir par /", p)
+				if !strings.HasSuffix(p, "/") && strings.Contains(p, "/") {
+					t.Errorf("prefix %q is a path but does not end in /", p)
 				}
 			}
 			if len(b.Sources) < 2 {

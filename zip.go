@@ -19,7 +19,7 @@ import (
 // and a digest check does not help — the digest of a zip bomb is still a digest.
 const maxFileSize = 8 << 20
 
-// extractZip writes the archive's files under prefix into dir, FLATTENED to
+// extractArchive writes the archive's files under prefix into dir, FLATTENED to
 // their base names, and returns how many it wrote.
 //
 // Flattening is what the engine wants: TeX asks for "beamerbasetitle.sty", never
@@ -30,8 +30,8 @@ const maxFileSize = 8 << 20
 // The extraction goes to a temporary directory and is renamed into place, and
 // the .complete marker is written last, so an interrupted run leaves nothing
 // that a later one would mistake for a finished bundle.
-func extractZip(archive []byte, prefixes []string, dir string) (int, error) {
-	files, err := readZip(archive, prefixes)
+func extractArchive(archive []byte, prefixes []string, dir string) (int, error) {
+	files, err := readArchive(archive, prefixes)
 	if err != nil {
 		return 0, err
 	}
