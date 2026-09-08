@@ -104,3 +104,70 @@ func keysOf(m map[string][]byte) []string {
 	}
 	return out
 }
+
+// A file whose first two bytes say gzip but whose body is not one is refused by
+// the reader rather than by the digest: an archive is checked for what it IS.
+func TestTarGzRefusesABodyThatIsNotGzip(t *testing.T) {
+	if _, err := readArchive([]byte{0x1f, 0x8b, 'n', 'o'}, []string{"x/"}); err == nil {
+		t.Fatal("a truncated gzip was accepted")
+	}
+}
+
+// A valid gzip holding something that is not a tar fails on the first header,
+// not silently as an empty selection — the two are different faults and a caller
+// that saw "no entries" would look in the wrong place.
+func TestTarGzRefusesAGzipThatIsNotATar(t *testing.T) {
+	var buf bytes.Buffer
+	zw := gzip.NewWriter(&buf)
+	if _, err := zw.Write([]byte(strings.Repeat("not a tar header at all", 100))); err != nil {
+		t.Fatal(err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := readTarGz(buf.Bytes(), []string{"x/"}); err == nil {
+		t.Fatal("a gzip that is not a tar was accepted")
+	}
+}
+
+// An entry whose base name is empty, "." or ".." names no file. Skipping it is
+// what keeps a crafted archive from deciding where the extraction writes.
+func TestTarGzSkipsEntriesWithNoBaseName(t *testing.T) {
+	gz := tarGz(t, map[string]string{
+		"fonts/..":    "up",
+		"fonts/.":     "here",
+		"fonts/A.otf": "a",
+	})
+	files, err := readTarGz(gz, []string{"fonts/"})
+	if err != nil {
+		t.Fatalf("readTarGz: %v", err)
+	}
+	if len(files) != 1 {
+		t.Errorf("got %v, want just A.otf", keysOf(files))
+	}
+}
+
+// A tar whose last header promises more bytes than the archive holds fails on the
+// entry rather than yielding a short file. An archive truncated in transit is
+// exactly the case a digest cannot catch on its own — the bytes that arrived
+// hash to something, just not to the pin — so the reader has to refuse it too.
+func TestTarGzRefusesATruncatedEntry(t *testing.T) {
+	var raw bytes.Buffer
+	tw := tar.NewWriter(&raw)
+	if err := tw.WriteHeader(&tar.Header{Name: "fonts/A.otf", Mode: 0o644, Size: 4096, Typeflag: tar.TypeReg}); err != nil {
+		t.Fatal(err)
+	}
+	// The header is in the buffer; the 4096 bytes it promises are not, and the
+	// writer is deliberately never closed so no padding or footer follows.
+	var gz bytes.Buffer
+	zw := gzip.NewWriter(&gz)
+	if _, err := zw.Write(raw.Bytes()); err != nil {
+		t.Fatal(err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := readTarGz(gz.Bytes(), []string{"fonts/"}); err == nil {
+		t.Fatal("a truncated entry was accepted")
+	}
+}
