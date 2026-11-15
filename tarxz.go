@@ -4,11 +4,8 @@
 package texmf
 
 import (
-	"archive/tar"
 	"bytes"
 	"fmt"
-	"io"
-	"path"
 
 	"github.com/go-compressions/xz"
 )
@@ -69,37 +66,5 @@ func readTarXZ(archive []byte, prefixes []string) (map[string][]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("reading xz: %w", err)
 	}
-	tr := tar.NewReader(io.LimitReader(zr, maxArchiveSize+1))
-	out := map[string][]byte{}
-	for {
-		h, err := tr.Next()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return nil, fmt.Errorf("reading tar: %w", err)
-		}
-		if h.Typeflag != tar.TypeReg || !underAny(h.Name, prefixes) {
-			continue
-		}
-		if path.Ext(h.Name) == ".lua" {
-			continue
-		}
-		base := path.Base(h.Name)
-		if base == "" || base == "." || base == ".." {
-			continue
-		}
-		data, err := io.ReadAll(io.LimitReader(tr, maxFileSize+1))
-		if err != nil {
-			return nil, fmt.Errorf("%s: %w", h.Name, err)
-		}
-		if len(data) > maxFileSize {
-			return nil, fmt.Errorf("%s: entry is larger than %d bytes", h.Name, maxFileSize)
-		}
-		out[base] = data
-	}
-	if len(out) == 0 {
-		return nil, fmt.Errorf("no entries under %q", prefixes)
-	}
-	return out, nil
+	return readTarEntries(zr, prefixes)
 }

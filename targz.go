@@ -36,7 +36,17 @@ func readTarGz(archive []byte, prefixes []string) (map[string][]byte, error) {
 		return nil, fmt.Errorf("reading gzip: %w", err)
 	}
 	defer zr.Close()
-	tr := tar.NewReader(io.LimitReader(zr, maxArchiveSize+1))
+	return readTarEntries(zr, prefixes)
+}
+
+// readTarEntries walks a decompressed tar stream and is shared by readTarGz and
+// readTarXZ: the two differ only in which decompressor they put in front of it,
+// and the selection, the bounds and the flattening are one implementation.
+//
+// It was duplicated when the xz reader was added, which is how a bound gets
+// raised in one copy and not the other.
+func readTarEntries(r io.Reader, prefixes []string) (map[string][]byte, error) {
+	tr := tar.NewReader(io.LimitReader(r, maxArchiveSize+1))
 	out := map[string][]byte{}
 	for {
 		h, err := tr.Next()
