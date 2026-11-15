@@ -178,6 +178,72 @@ var PGFPlots = Bundle{
 	},
 }
 
+// natbibVersion is the pinned release, and it is a TeX Live package REVISION
+// rather than CTAN's "8.31b". That is deliberate and it is what the archive
+// itself says: the pinned file carries tlpkg/tlpobj/natbib.tlpobj with
+// "revision 79618", and the revision is what changes when the shipped bytes
+// change — CTAN's 8.31b has named the same package since 2010. Raising it means
+// raising the digest and the URL in the same commit; the three are one fact.
+const natbibVersion = "r79618"
+
+// natbibCTANVersion is what CTAN calls the package, recorded so nobody has to
+// wonder whether r79618 is a different natbib. It is not used in a URL.
+const natbibCTANVersion = "8.31b"
+
+// Natbib is natbib: author-year and numbered citations, and the package a
+// quarter of real papers load for them.
+//
+// Without it an engine's own emulation renders \citep{alpha} as "[1]" where a
+// reference build gives "(Author et al., 2021)" — a citation about three times
+// too narrow, on 68 of 154 measured arXiv papers, 20 of which load natbib by
+// name (go-tex/engine#703). With the real package the output matches the
+// reference word for word, so this is a delivery problem and not a typesetting
+// one.
+//
+// ⛔ THE ARCHIVE IS TeX LIVE'S, AND THAT IS NOT A PREFERENCE. natbib ships on
+// CTAN as natbib.dtx + natbib.ins and NOTHING ELSE: there is no TDS zip
+// (install/macros/latex/contrib/natbib.tds.zip is a 404) and natbib.zip holds
+// the sources, the three .bst and two PDFs, with no generated .sty anywhere. A
+// ready natbib.sty exists only where docstrip has already been run, which is
+// inside a distribution. TeX Live's runtime package is exactly the files an
+// engine wants and is .tar.xz, which is why this module reads one (tarxz.go).
+//
+// The route names the REVISION — archive/natbib.r79618.tar.xz — and not
+// archive/natbib.tar.xz, which serves whatever is current and so could not
+// carry a pin. Measured 2026-11-15: the revisioned file and the unversioned one
+// are byte-identical (both sha256 212c77a3…), so this URL costs nothing and
+// says what it serves.
+//
+// ⚠ The frozen snapshot historic/systems/texlive/2025/tlnet-final/archive/
+// natbib.tar.xz holds the same five files and the same bytes INSIDE (natbib.sty
+// is d9b0f6ed58f5c260d2df9435b97da23ca326e3596db8ef0681bbff7a14343603 from
+// either) but is a different .tar.xz: two independently compressed tarballs are
+// not the same file. It is the fallback to reach for if tlnet ever prunes this
+// revision, and it would need its own digest — which is exactly why a pin names
+// ONE archive and TestUpstreamPinsStillHold exists to notice when it moves.
+var Natbib = Bundle{
+	Name:     "natbib",
+	Version:  natbibVersion,
+	SHA256:   "212c77a30dab80de50ffb64a497ab491ed1ff3439e76811993c19428faa1927a",
+	Prefixes: []string{"tex/latex/natbib/"},
+	// The archive ships natbib.sty and bibentry.sty under that prefix, plus the
+	// three .bst under bibtex/bst/natbib/ — which no \usepackage names, and which
+	// an engine that does not run BibTeX never opens.
+	Provides: []string{"natbib", "bibentry"},
+	Sources: []Source{
+		OCISource{
+			Registry:   "ghcr.io",
+			Repository: "go-tex/texmf/natbib",
+			Reference:  natbibVersion,
+			Label:      "ghcr.io/go-tex/texmf/natbib:" + natbibVersion,
+		},
+		HTTPSource{
+			URL:   "https://mirror.ctan.org/systems/texlive/tlnet/archive/natbib." + natbibVersion + ".tar.xz",
+			Label: "TeX Live tlnet, natbib " + natbibVersion + " (CTAN " + natbibCTANVersion + ")",
+		},
+	},
+}
+
 // Requires names the bundles a bundle cannot load without, innermost first. It is
 // a fact about the packages, not about any one caller, so it belongs beside the
 // pins rather than in whatever program happens to fetch them.
@@ -213,6 +279,7 @@ func WithDependencies(b Bundle) []Bundle {
 // version or digest this code does not name.
 var All = map[string]Bundle{
 	Beamer.Name:     Beamer,
+	Natbib.Name:     Natbib,
 	PGF.Name:        PGF,
 	PGFPlots.Name:   PGFPlots,
 	Translator.Name: Translator,

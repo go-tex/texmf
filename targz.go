@@ -71,10 +71,15 @@ func readTarGz(archive []byte, prefixes []string) (map[string][]byte, error) {
 	return out, nil
 }
 
-// readArchive reads a zip or a gzipped tar, whichever the bytes are.
+// readArchive reads a zip, a gzipped tar or an xz'd tar, whichever the bytes
+// are. The order is sniff-then-dispatch and never a catalogue field: see isGzip
+// and isXZ.
 func readArchive(archive []byte, prefixes []string) (map[string][]byte, error) {
-	if isGzip(archive) {
+	switch {
+	case isGzip(archive):
 		return readTarGz(archive, prefixes)
+	case isXZ(archive):
+		return readTarXZ(archive, prefixes)
 	}
 	return readZip(archive, prefixes)
 }

@@ -45,6 +45,22 @@ Measured over **10025 real beamer talks**:
 
 The difference is not an edge case; it is most of the content.
 
+And natbib, for the same reason read off the text rather than the page count:
+without it an engine's own emulation renders `\citep{alpha}` as `[1]` where a
+reference build gives `(Author et al., 2021)` — a citation about three times too
+narrow, on **68 of 154** measured arXiv papers, 20 of which load the package by
+name (go-tex/engine#703). With the real package the output matches the reference
+word for word, so what was missing was delivery and not typesetting.
+
+⛔ natbib is also why this module reads `.tar.xz`. It ships on CTAN as
+`natbib.dtx` + `natbib.ins` and nowhere as a ready `.sty`; a generated
+`natbib.sty` exists only where docstrip has already run, which is inside a
+distribution, and TeX Live's package archives are xz'd tars. The decoder is
+[go-compressions/xz](https://github.com/go-compressions/xz) — pure Go, this
+fleet's own, and it bounds what a stream NEEDS rather than believing the window
+its header declares, which is the only safe way to decompress an archive fetched
+over the network: the digest of a bomb is still a digest.
+
 ## How a bundle arrives
 
 Routes are tried in order, and **the digest is the only trust anchor** — a route
@@ -60,6 +76,11 @@ is a delivery mechanism, never an authority:
 Only the files a TeX engine opens are extracted: `tex/latex/beamer/` and nothing
 else. A TDS archive's `doc/` and `source/` trees are thousands of files that
 never reach the disk.
+
+The container is **sniffed, not declared**: zip, gzipped tar and xz'd tar are
+told apart by their first bytes, because which one an upstream release publishes
+is a fact about that release rather than a choice — and a catalogue field every
+entry had to get right is a field no entry could check.
 
 ## In a browser
 
