@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"os"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -26,7 +27,19 @@ func TestUpstreamPinsStillHold(t *testing.T) {
 	if os.Getenv("TEXMF_NETWORK") == "" {
 		t.Skip("TEXMF_NETWORK unset: this test reaches the network")
 	}
-	for _, b := range []Bundle{Beamer} {
+	// ⛔ DRIVEN FROM THE CATALOGUE, NOT FROM A HAND-WRITTEN LIST. This read
+	// `[]Bundle{Beamer}` while All held six bundles, so five upstream pins were
+	// never checked — including the two font routes, which are the most fragile
+	// of the set: a sourceforge download path and a GitHub release asset. A test
+	// whose subject list is typed by hand drifts from the population it covers,
+	// and nothing says so when a bundle is added.
+	names := make([]string, 0, len(All))
+	for name := range All {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		b := All[name]
 		t.Run(b.Name+"@"+b.Version, func(t *testing.T) {
 			// Only the LAST source is checked: it is the upstream release, the
 			// one this project does not control and therefore the one whose
@@ -48,8 +61,16 @@ func TestUpstreamPinsStillHold(t *testing.T) {
 				t.Fatalf("extraction: %v", err)
 			}
 			t.Logf("%s: %d fichiers sous %v", src.Describe(), n, b.Prefixes)
-			if n < 50 {
-				t.Errorf("only %d files — the archive is not the shape expected", n)
+			// ⛔ A FLOOR MUST HOLD FOR EVERY BUNDLE OR IT IS A FLOOR FOR ONE.
+			// This was `n < 50`, a beamer-shaped number: beamer extracts 129
+			// files, and natbib extracts TWO — natbib.sty and bibentry.sty are
+			// the whole of what a TeX engine wants from it. Tied instead to a
+			// fact the bundle declares: it cannot answer more package names than
+			// it ships files, so one file per Provides entry is the least it can
+			// be and still be the archive it claims.
+			if n < len(b.Provides) {
+				t.Errorf("%d file(s) extracted for %d name(s) in Provides %v — the "+
+					"archive is not the shape this entry claims", n, len(b.Provides), b.Provides)
 			}
 		})
 	}

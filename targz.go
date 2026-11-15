@@ -36,7 +36,17 @@ func readTarGz(archive []byte, prefixes []string) (map[string][]byte, error) {
 		return nil, fmt.Errorf("reading gzip: %w", err)
 	}
 	defer zr.Close()
-	tr := tar.NewReader(io.LimitReader(zr, maxArchiveSize+1))
+	return readTarEntries(zr, prefixes)
+}
+
+// readTarEntries walks a decompressed tar stream and is shared by readTarGz and
+// readTarXZ: the two differ only in which decompressor they put in front of it,
+// and the selection, the bounds and the flattening are one implementation.
+//
+// It was duplicated when the xz reader was added, which is how a bound gets
+// raised in one copy and not the other.
+func readTarEntries(r io.Reader, prefixes []string) (map[string][]byte, error) {
+	tr := tar.NewReader(io.LimitReader(r, maxArchiveSize+1))
 	out := map[string][]byte{}
 	for {
 		h, err := tr.Next()
@@ -71,10 +81,15 @@ func readTarGz(archive []byte, prefixes []string) (map[string][]byte, error) {
 	return out, nil
 }
 
-// readArchive reads a zip or a gzipped tar, whichever the bytes are.
+// readArchive reads a zip, a gzipped tar or an xz'd tar, whichever the bytes
+// are. The order is sniff-then-dispatch and never a catalogue field: see isGzip
+// and isXZ.
 func readArchive(archive []byte, prefixes []string) (map[string][]byte, error) {
-	if isGzip(archive) {
+	switch {
+	case isGzip(archive):
 		return readTarGz(archive, prefixes)
+	case isXZ(archive):
+		return readTarXZ(archive, prefixes)
 	}
 	return readZip(archive, prefixes)
 }

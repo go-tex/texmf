@@ -25,7 +25,13 @@ on:
         required: true
         default: beamer
         type: choice
-        options: [beamer, pgf, pgfplots, translator]
+        # ⛔ THIS LIST IS HAND-WRITTEN BECAUSE GitHub's choice inputs cannot be
+        # generated, and it had already drifted: linuxlibertine and libertinus
+        # were added to the catalogue and never here, so neither font bundle
+        # could be mirrored at all. TestPublishWorkflowOffersEveryBundle now
+        # compares it with All and fails when a bundle is added without a line
+        # here — the list stays literal, the AGREEMENT is derived.
+        options: [beamer, libertinus, linuxlibertine, natbib, pgf, pgfplots, translator]
 
 permissions:
   contents: read
