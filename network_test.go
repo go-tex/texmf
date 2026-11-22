@@ -87,7 +87,11 @@ func TestMirrorMatchesThePin(t *testing.T) {
 	if os.Getenv("TEXMF_NETWORK") == "" {
 		t.Skip("TEXMF_NETWORK unset: this test reaches the network")
 	}
-	for _, b := range []Bundle{Beamer} {
+	// The bundles whose mirror is verified public. NOT every entry of All yet:
+	// measured 2026-11-22, libertinus, linuxlibertine and natbib answer an anonymous
+	// 401 (private packages), so iterating All would be red until their visibility is
+	// changed in the package settings, which no API call does.
+	for _, b := range []Bundle{Beamer, Inconsolata} {
 		t.Run(b.Name+"@"+b.Version, func(t *testing.T) {
 			var oci Source
 			for _, s := range b.Sources {
