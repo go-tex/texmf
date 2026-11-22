@@ -156,6 +156,8 @@ func TestLookupAnswersPackageNames(t *testing.T) {
 		{"pgfplotstable", "pgfplots"},
 		{"beamer", "beamer"},
 		{"beamerarticle", "beamer"},
+		{"zi4", "inconsolata"},
+		{"inconsolata", "inconsolata"},
 		{"fancyhdr", ""},
 		{"", ""},
 	} {

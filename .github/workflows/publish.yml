@@ -31,7 +31,7 @@ on:
         # could be mirrored at all. TestPublishWorkflowOffersEveryBundle now
         # compares it with All and fails when a bundle is added without a line
         # here — the list stays literal, the AGREEMENT is derived.
-        options: [beamer, libertinus, linuxlibertine, natbib, pgf, pgfplots, translator]
+        options: [beamer, inconsolata, libertinus, linuxlibertine, natbib, pgf, pgfplots, translator]
 
 permissions:
   contents: read

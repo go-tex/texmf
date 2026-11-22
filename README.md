@@ -61,6 +61,10 @@ fleet's own, and it bounds what a stream NEEDS rather than believing the window
 its header declares, which is the only safe way to decompress an archive fetched
 over the network: the digest of a bomb is still a digest.
 
+Fonts ride the same route: `texmf.Inconsolata` (answers `zi4` and `inconsolata`,
+SIL OFL 1.1) is the monospaced face acmart asks for, so `\texttt` takes the same
+advance as under a reference build.
+
 ## How a bundle arrives
 
 Routes are tried in order, and **the digest is the only trust anchor** — a route
