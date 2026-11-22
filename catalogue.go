@@ -274,6 +274,56 @@ func WithDependencies(b Bundle) []Bundle {
 	return out
 }
 
+// inconsolataVersion is the pinned release, a TeX Live package REVISION for the
+// reason natbibVersion is: the pinned archive carries tlpkg/tlpobj/inconsolata.tlpobj
+// saying "revision 79618", and CTAN's "1.121" names the package across revisions.
+// Raising it means raising the digest and the URL in the same commit.
+const inconsolataVersion = "r79618"
+
+// inconsolataCTANVersion is what CTAN calls the package; it is not used in a URL.
+const inconsolataCTANVersion = "1.121"
+
+// Inconsolata is the monospaced face \usepackage{zi4} and \usepackage{inconsolata}
+// ask for: Inconsolatazi4-Regular.otf and Inconsolatazi4-Bold.otf.
+//
+// acmart loads it by name (\RequirePackage[varqu]{zi4}), so every paper in that
+// class sets \texttt in it under any reference build, where an engine with no such
+// font sets Latin Modern Mono — a different advance, so different line breaks in
+// every verbatim and \texttt run.
+//
+// Provenance, read from the archive and the TeX Live database on 2026-11-22:
+//
+//   - the archive is TeX Live's runtime package inconsolata.r79618.tar.xz, sha256
+//     d3d9d4c4…af06e. CTAN ships /fonts/inconsolata as a TDS tree too, but TeX Live's
+//     is the revisioned file a pin can name, as for natbib.
+//   - the fonts are Raph Levien's Inconsolata, SIL Open Font License 1.1 (the
+//     package's doc/fonts/inconsolata/OFL.txt). tlpkg/tlpobj/inconsolata.tlpobj
+//     lists "catalogue-license ofl apache2 lppl1.3": the OFL covers the faces, the
+//     other two the .sty/.fd support files, which this entry does NOT take.
+//
+// Only fonts/opentype/public/inconsolata/ is taken, and of its four files this
+// engine opens the two zi4 ones; InconsolataN-* belong to the nonzero-slashed
+// variant and ride along because a prefix is a directory, not a list.
+var Inconsolata = Bundle{
+	Name:     "inconsolata",
+	Version:  inconsolataVersion,
+	SHA256:   "d3d9d4c42f421588a8f50f34e4aa8d482ec684d8baed536c27b7b3604a7af06e",
+	Prefixes: []string{"fonts/opentype/public/inconsolata/"},
+	Provides: []string{"inconsolata", "zi4"},
+	Sources: []Source{
+		OCISource{
+			Registry:   "ghcr.io",
+			Repository: "go-tex/texmf/inconsolata",
+			Reference:  inconsolataVersion,
+			Label:      "ghcr.io/go-tex/texmf/inconsolata:" + inconsolataVersion,
+		},
+		HTTPSource{
+			URL:   "https://mirror.ctan.org/systems/texlive/tlnet/archive/inconsolata." + inconsolataVersion + ".tar.xz",
+			Label: "TeX Live tlnet, inconsolata " + inconsolataVersion + " (CTAN " + inconsolataCTANVersion + ")",
+		},
+	},
+}
+
 // All is the catalogue, keyed by bundle name. The publish workflow reads a pin
 // from here rather than repeating it in YAML, so a mirror can never carry a
 // version or digest this code does not name.
@@ -286,6 +336,7 @@ var All = map[string]Bundle{
 
 	LinuxLibertine.Name: LinuxLibertine,
 	Libertinus.Name:     Libertinus,
+	Inconsolata.Name:    Inconsolata,
 }
 
 // Lookup returns the catalogue bundle that answers a name — its own, or one of
